@@ -12,7 +12,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# -------------------------------------------------------
+
 
 # include router to the system
 app.include_router(prompt_router.router, prefix="/api/v1", tags=["Prompts"])

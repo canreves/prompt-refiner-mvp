@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 try:
-    from ..schemas.user import User
-    from ..services.firebase_db import save_user_to_firestore
+    from schemas.user import User
+    from services.firebase_db import save_user_to_firestore
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

@@ -6,9 +6,9 @@ import sys
 from pathlib import Path
 
 try:
-    from ..schemas.prompt import PromptDBModel, PromptInput
-    from ..services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius
-    from ..services.firebase_db import save_prompt_to_firestore
+    from schemas.prompt import PromptDBModel, PromptInput
+    from services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius
+    from services.firebase_db import save_prompt_to_firestore
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

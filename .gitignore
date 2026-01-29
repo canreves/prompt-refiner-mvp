@@ -12,4 +12,4 @@ venv/
 .idea/
 
 .venv
-backend/services/prompt-refiner-mvp-firebase-adminsdk-fbsvc-72e6cf72fb.json
+backend/services/serviceAccountKey.json

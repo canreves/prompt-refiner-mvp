@@ -2,35 +2,60 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from datetime import datetime
 
-# 1. user input from frontend
-class PromptInput(BaseModel):
-    user_id: str
-    input_prompt: str
-    target_role: Optional[str] = "General Assistant"
-
-# 2. parsed data
+# 1. parsed data
 class ParsedPrompt(BaseModel):
     role: Optional[str] = None
     task: Optional[str] = None
     context: Optional[str] = None
+    style: Optional[str] = None
+    output : Optional[str] = None
 
-# 3. prompt object data to be stored in firestore
+
+# 2. prompt object data to be stored in firestore
 class PromptDBModel(BaseModel):
-    prompt_id: str
-    user_id: str
-    input_prompt: str
-    parsed_data: ParsedPrompt  # role, task, context
-    optimized_prompt: Optional[str] = None
-    
+    promptID: str
+    userID: str
+    projectID: str
+    inputPrompt: str
+
+    parsedData: Optional[ParsedPrompt] = None  # role, task, context
+    optimizedPrompts: Optional[Dict[str, str]] = None
+    usedLLMs: Optional[Dict[str, str]] = None
+
     # metrics
-    initial_token_size: int = 0
-    final_token_size: int = 0
-    latency_ms: float = 0.0
+    initialTokenSize: int = 0
+    finalTokenSizes: Dict[str, int] = {}
+    latencyMs: Dict[str, float] = {}
+    copyCount: int = 0
+    overallScores: Optional[Dict[str, float]] = None
     
     # metadata
-    created_at: datetime = Field(default_factory=datetime.now)
-    is_favorite: bool = False
-    rating: Optional[int] = None # [1,5]
+    createdAt: datetime = Field(default_factory=datetime.now)
+    isFavorite: bool = False
+    ratings: Optional[Dict[str, int]] = None # [1,5]
+
+    def __init__(self, **data):
+        super().__init__(**data)
+
+    def to_firestore_dict(self) -> dict:
+        data = {
+            "promptID": self.promptID,
+            "userID": self.userID,
+            "projectID": self.projectID,
+            "inputPrompt": self.inputPrompt,
+            "parsedData": self.parsedData.model_dump() if self.parsedData else None,
+            "optimizedPrompts": self.optimizedPrompts,
+            "usedLLMs": self.usedLLMs,
+            "initialTokenSize": self.initialTokenSize,
+            "finalTokenSizes": self.finalTokenSizes,
+            "latencyMs": self.latencyMs,
+            "copyCount": self.copyCount,
+            "overallScores": self.overallScores,
+            "createdAt": self.createdAt,  # Firestore handles datetime objects
+            "isFavorite": self.isFavorite,
+            "ratings": self.ratings
+        }
+        return data
+
     
-    class Config:
-        from_attributes = True
+    

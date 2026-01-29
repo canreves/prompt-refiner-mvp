@@ -1,7 +1,6 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-import os
 import sys
 from pathlib import Path
 
@@ -29,7 +28,7 @@ def get_firestore_client():
     initialize_firebase()
     return firestore.client()
 
-def upload_prompt_to_firestore(prompt : PromptDBModel) -> str:
+def save_prompt_to_firestore(prompt : PromptDBModel) -> str:
     db = get_firestore_client()
     doc_ref = db.collection("prompts").add(prompt.to_firestore_dict())
     return doc_ref[1].id  # Return the document ID

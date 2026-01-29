@@ -25,3 +25,27 @@ export const optimizePromptService = async (userInput) => {
     throw error;
   } 
 };
+
+export const createUserService = async (userData) => {
+  try {
+    // Backend'e gönderilecek kullanıcı verisi
+    const payload = {
+      name: userData.name,
+      surname: userData.surname,
+      username: userData.username,
+      email: userData.email,
+      profileImageURL: userData.profileImageURL || null
+    };
+
+    // İsteği gönderiyoruz (POST)
+    const response = await axios.post(`${API_URL}/create`, payload);
+
+    // Başarılı olursa cevabı döndür
+    return response.data;
+
+  } catch (error) {
+    // Hata olursa konsola yaz ve hatayı fırlat
+    console.error("Kullanıcı oluşturma hatası:", error);
+    throw error;
+  }
+};

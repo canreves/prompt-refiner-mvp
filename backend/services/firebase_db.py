@@ -1,6 +1,8 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -20,8 +22,16 @@ except ImportError:
 # starting firebase (singleton pattern)
 def initialize_firebase():
     if not firebase_admin._apps:
-        # we will get serviceAccountKey.json path here.
-        cred = credentials.Certificate("backend/services/serviceAccountKey.json")
+        # Prefer Render env var for service account JSON
+        service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+        service_account_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
+
+        if service_account_json:
+            cred = credentials.Certificate(json.loads(service_account_json))
+        else:
+            # Fallback to local file path for dev
+            local_path = service_account_path or "backend/services/serviceAccountKey.json"
+            cred = credentials.Certificate(local_path)
         firebase_admin.initialize_app(cred)
 
 def get_firestore_client():

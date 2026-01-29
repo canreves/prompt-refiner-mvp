@@ -1,8 +1,8 @@
 
 import axios from 'axios';
 
-// Backend URL'i (Cihangir deploy edene kadar bunu kullan)
-const API_URL = "http://127.0.0.1:8000/api/v1"; 
+// Backend URL'i (Render'da REACT_APP_API_URL ile ayarlanır)
+const API_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/v1"; 
 
 export const optimizePromptService = async (userInput) => {
   try {

@@ -7,14 +7,13 @@ from pathlib import Path
 
 try:
     from ..schemas.prompt import PromptDBModel, PromptInput
-    from ..services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius
-    from ..services.firebase_db import save_prompt_to_firestore
+    from ..services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius, test_nebius_api
+    
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from schemas.prompt import PromptDBModel, PromptInput
-    from services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius
-    from services.firebase_db import save_prompt_to_firestore
+    from services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius, test_nebius_api
     
 import uuid
 
@@ -51,8 +50,27 @@ async def optimize_prompt(request: PromptInput):
 @router.post("/savePrompt", response_model=PromptDBModel)
 async def save_prompt(prompt: PromptDBModel):
     try:
-        prompt_id = save_prompt_to_firestore(prompt)
+        prompt_id = prompt.set_to_firestore()
         return prompt
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+
+@router.post("/testNebius", response_model=dict)
+async def test_nebius_ai(request : dict):
+    """
+    Test endpoint for Nebius AI integration.
+    Expects a JSON body with 'user_input' and 'ai_model' fields.
+    """
+    try:
+        user_input = request.get("user_input", "")
+        ai_model = request.get("ai_model", "openai/gpt-oss-20b")
+        
+        user_response = test_nebius_api(user_input, ai_model)
+        
+        return user_response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+

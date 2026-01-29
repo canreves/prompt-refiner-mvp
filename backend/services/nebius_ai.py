@@ -3,12 +3,14 @@ import json
 from core.config import settings
 from schemas.prompt import ParsedPrompt
 
+import json
+
 client = OpenAI(
     base_url="https://api.studio.nebius.ai/v1",
     api_key=settings.NEBIUS_API_KEY,
 )
 
-def parse_prompt_with_nebius(user_input: str) -> ParsedPrompt:
+def parse_prompt_with_nebius(user_input: str, ai_model : str) -> ParsedPrompt:
     """
     it analyzes the text entered by the user and separates it into
     role, task, and context. we force the output into JSON format.
@@ -28,7 +30,7 @@ def parse_prompt_with_nebius(user_input: str) -> ParsedPrompt:
     """
     
     response = client.chat.completions.create(
-        model=settings.NEBIUS_MODEL,
+        model=ai_model,
         messages=[
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": f"Analyze this prompt: {user_input}"}
@@ -74,3 +76,18 @@ def optimize_prompt_with_nebius(parsed_data: ParsedPrompt, original_input: str) 
     )
     
     return response.choices[0].message.content
+
+
+def test_nebius_api(prompt :str, ai_model: str = "openai/gpt-oss-20b") -> str: 
+    response = client.chat.completions.create(
+        model= ai_model,
+        messages=[
+            {
+                "role" : "user",
+                "content" : prompt
+            }
+        ]
+    )
+
+    return json.loads(response.to_json())
+

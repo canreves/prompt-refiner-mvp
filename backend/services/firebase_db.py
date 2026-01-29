@@ -2,9 +2,18 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 import os
-from dotenv import load_dotenv
+import sys
+from pathlib import Path
 
-load_dotenv()
+# Handle imports for both direct execution and module import
+try:
+    from ..schemas.user import User
+    from ..schemas.prompt import PromptDBModel
+except ImportError:
+    # Add parent directory to path when running directly
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from schemas.user import User
+    from schemas.prompt import PromptDBModel
 
 
 
@@ -13,18 +22,21 @@ load_dotenv()
 def initialize_firebase():
     if not firebase_admin._apps:
         # we will get serviceAccountKey.json path here.
-        cred = credentials.Certificate(os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH"))
+        cred = credentials.Certificate("backend/services/serviceAccountKey.json")
         firebase_admin.initialize_app(cred)
 
 def get_firestore_client():
     initialize_firebase()
     return firestore.client()
 
-def upload_prompt_to_firestore(data: dict):
+def upload_prompt_to_firestore(prompt : PromptDBModel) -> str:
     db = get_firestore_client()
-    db.collection("prompts").add(data)
+    doc_ref = db.collection("prompts").add(prompt.to_firestore_dict())
+    return doc_ref[1].id  # Return the document ID
 
-# def save_prompt_to_firestore(data: dict):
-#     db = firestore.client()
-#     # add to the 'prompts'
-#     db.collection("prompts").add(data)
+def save_user_to_firestore(user: User) -> str:
+    db = get_firestore_client()
+    user_ref = db.collection("users").document(user.userID)
+    user_ref.set(user.to_firestore_dict())
+    
+    return user.userID

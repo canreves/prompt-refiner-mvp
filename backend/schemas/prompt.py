@@ -2,6 +2,11 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from datetime import datetime
 
+class PromptInput(BaseModel):
+    userID: str
+    inputPrompt: str
+    targetRole : Optional[str] = ""
+ 
 # 1. parsed data
 class ParsedPrompt(BaseModel):
     role: Optional[str] = None

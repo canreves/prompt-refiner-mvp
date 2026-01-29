@@ -37,6 +37,7 @@ async def optimize_prompt(request: PromptInput):
         return PromptDBModel(
             promptID=str(uuid.uuid4()),
             userID=request.userID,
+            projectID="default-project",
             inputPrompt=request.inputPrompt,
             parsedData=parsed_result,
             optimizedPrompts={"default": optimized_text},

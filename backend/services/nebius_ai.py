@@ -37,7 +37,7 @@ def parse_prompt_with_nebius(user_input: str) -> ParsedPrompt:
         response_format={"type": "json_object"} # guarantees return type of json
     )
     
-    # json.str -> py.str
+    # json.str -> py.str
     content = response.choices[0].message.content
     data = json.loads(content)
     

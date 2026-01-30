@@ -8,13 +8,13 @@ from pathlib import Path
 
 try:
     from ..schemas.prompt import PromptDBModel, PromptInput
-    from ..services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius, test_nebius_api
+    from ..services.nebius_ai import  test_nebius_api
     from ..services.firebase_db import get_firestore_client
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from schemas.prompt import PromptDBModel, PromptInput
-    from services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius, test_nebius_api
+    from services.nebius_ai import test_nebius_api
     from services.firebase_db import get_firestore_client
     
 import uuid

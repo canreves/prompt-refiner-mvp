@@ -1,3 +1,5 @@
+import json
+import uuid
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -6,12 +8,15 @@ from datetime import datetime
 import sys
 from pathlib import Path
 
-try:
+
+try:    
+    from ..services.nebius_ai import run_nebius_ai
     from ..services.firebase_db import get_firestore_client
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from services.firebase_db import get_firestore_client
+    from services.nebius_ai import run_nebius_ai    
 
 
 class PromptInput(BaseModel):

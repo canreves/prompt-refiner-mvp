@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LoginPage } from '@/app/components/LoginPage';
 import { PromptHistory } from '@/app/components/PromptHistory';
 import { PromptInput } from '@/app/components/PromptInput';
@@ -7,9 +7,14 @@ import { ScoreSettings } from '@/app/components/ScoreSettings';
 import { OptimizeButton } from '@/app/components/OptimizeButton';
 import { ResultDisplay } from '@/app/components/ResultDisplay';
 import { Toaster } from '@/app/components/ui/sonner';
-import { saveFeedback } from '@/services/feedbackService';
 import { toast } from 'sonner';
 import { LogOut } from 'lucide-react';
+import { 
+  optimizePromptService, 
+  getPromptHistoryService, 
+  deletePromptService,
+  saveFeedbackService 
+} from '@/services/api';
 
 interface HistoryItem {
   id: string;
@@ -44,6 +49,37 @@ export default function App() {
   const [tokenCount, setTokenCount] = useState(0);
   const [latency, setLatency] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ uid: string; email: string } | null>(null);
+  const [currentPromptID, setCurrentPromptID] = useState<string | null>(null);
+
+  // Load prompt history when user logs in
+  useEffect(() => {
+    if (isAuthenticated && currentUser) {
+      loadPromptHistory();
+    }
+  }, [isAuthenticated, currentUser]);
+
+  const loadPromptHistory = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const response = await getPromptHistoryService(currentUser.uid);
+      if (response.status === 'success' && response.history) {
+        const formattedHistory: HistoryItem[] = response.history.map((item: any) => ({
+          id: item.id,
+          prompt: item.prompt,
+          optimizedPrompt: item.optimizedPrompt,
+          timestamp: new Date(item.timestamp),
+          tokenCount: item.tokenCount,
+          latency: item.latency,
+        }));
+        setHistory(formattedHistory);
+      }
+    } catch (error) {
+      console.error('Error loading history:', error);
+      // Don't show error toast for history loading failures
+    }
+  };
 
   const handleOptimize = async () => {
     if (!prompt.trim()) return;
@@ -51,31 +87,42 @@ export default function App() {
     setIsOptimizing(true);
     const startTime = Date.now();
     
-    // Mock optimization - Backend'den gelecek
-    setTimeout(() => {
+    try {
+      // Call the real backend API
+      const userID = currentUser?.uid || 'anonymous-user';
+      const response = await optimizePromptService(prompt, userID);
+      
       const endTime = Date.now();
-      const calculatedLatency = endTime - startTime;
+      const calculatedLatency = response.latencyMs?.default || (endTime - startTime);
       
-      // Backend'den gelecek - şimdilik mock
-      const mockTokenCount = Math.ceil(prompt.length / 4);
-      const mockOptimized = `Bu optimize edilmiş prompttur. Backend entegrasyonu yapıldığında buraya gerçek optimize edilmiş prompt gelecek.\n\nÖrnek optimize edilmiş içerik: ${prompt.substring(0, 100)}...`;
+      // Extract data from response
+      const optimizedText = response.optimizedPrompts?.default || '';
+      const tokens = response.initialTokenSize || Math.ceil(prompt.length / 4);
       
-      setOptimizedPrompt(mockOptimized);
-      setTokenCount(mockTokenCount);
+      setOptimizedPrompt(optimizedText);
+      setTokenCount(tokens);
       setLatency(calculatedLatency);
+      setCurrentPromptID(response.promptID);
       
+      // Add to local history
       const newHistoryItem: HistoryItem = {
-        id: Date.now().toString(),
+        id: response.promptID,
         prompt,
-        optimizedPrompt: mockOptimized,
+        optimizedPrompt: optimizedText,
         timestamp: new Date(),
-        tokenCount: mockTokenCount,
+        tokenCount: tokens,
         latency: calculatedLatency,
       };
       
       setHistory([newHistoryItem, ...history]);
+      toast.success('Prompt optimized successfully!');
+      
+    } catch (error: any) {
+      console.error('Optimization error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to optimize prompt. Please try again.');
+    } finally {
       setIsOptimizing(false);
-    }, 1500);
+    }
   };
 
   const handleHistorySelect = (item: HistoryItem) => {
@@ -83,6 +130,7 @@ export default function App() {
     setOptimizedPrompt(item.optimizedPrompt);
     setTokenCount(item.tokenCount);
     setLatency(item.latency);
+    setCurrentPromptID(item.id);
   };
 
   const handleRate = async (rating: number) => {
@@ -92,7 +140,8 @@ export default function App() {
     }
 
     try {
-      const feedbackId = await saveFeedback({
+      await saveFeedbackService({
+        promptID: currentPromptID,
         originalPrompt: prompt,
         optimizedPrompt: optimizedPrompt,
         rating: rating,
@@ -100,9 +149,9 @@ export default function App() {
         scoreWeights: scoreWeights,
         tokenCount: tokenCount,
         latency: latency,
+        userID: currentUser?.uid || 'anonymous',
       });
 
-      console.log('Feedback saved successfully with ID:', feedbackId);
       toast.success('Thank you for your feedback!');
     } catch (error) {
       console.error('Error saving feedback:', error);
@@ -110,8 +159,15 @@ export default function App() {
     }
   };
 
-  const handleDeleteHistory = (id: string) => {
-    setHistory(history.filter(item => item.id !== id));
+  const handleDeleteHistory = async (id: string) => {
+    try {
+      await deletePromptService(id);
+      setHistory(history.filter(item => item.id !== id));
+      toast.success('Prompt deleted from history');
+    } catch (error) {
+      console.error('Error deleting prompt:', error);
+      toast.error('Failed to delete prompt');
+    }
   };
 
   const handleNewPrompt = () => {
@@ -120,19 +176,28 @@ export default function App() {
     setTokenCount(0);
     setLatency(0);
     setSelectedLLM('');
+    setCurrentPromptID(null);
     setScoreWeights({ task: 2, role: 2, style: 2, output: 2, rules: 2 });
   };
 
   const handleLogOut = () => {
     setIsAuthenticated(false);
+    setCurrentUser(null);
+    setHistory([]);
+    handleNewPrompt();
     toast.success('You have been logged out successfully!');
+  };
+
+  const handleLoginSuccess = (user: { uid: string; email: string }) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
   };
 
   // Show login page if not authenticated
   if (!isAuthenticated) {
     return (
       <>
-        <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />
+        <LoginPage onLoginSuccess={handleLoginSuccess} />
         <Toaster />
       </>
     );

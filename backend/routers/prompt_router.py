@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-
+from firebase_admin import firestore
 
 # from schemas.prompt import PromptInput, PromptDBModel
 import sys
@@ -8,22 +8,26 @@ from pathlib import Path
 try:
     from schemas.prompt import PromptDBModel, PromptInput
     from services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius, test_nebius_api
-    from services.firebase_db import save_prompt_to_firestore
+    from services.firebase_db import get_firestore_client
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from schemas.prompt import PromptDBModel, PromptInput
     from services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius, test_nebius_api
+    from services.firebase_db import get_firestore_client
     
 import uuid
+import time
 
 router = APIRouter()
 
 @router.post("/optimize", response_model=PromptDBModel)
 async def optimize_prompt(request: PromptInput):
     try:
+        start_time = time.time()
+        
         # 1. step: analyze prompt (parsing)
-        parsed_result = parse_prompt_with_nebius(request.inputPrompt)
+        parsed_result = parse_prompt_with_nebius(request.inputPrompt, "meta-llama/Llama-3.3-70B-Instruct")
         
         # 2. step: optimize it
         optimized_text = optimize_prompt_with_nebius(parsed_result, request.inputPrompt)
@@ -32,9 +36,14 @@ async def optimize_prompt(request: PromptInput):
         initial_tokens = len(request.inputPrompt.split())
         final_tokens = len(optimized_text.split())
         
-        # 4. step: return the answers
-        return PromptDBModel(
-            promptID=str(uuid.uuid4()),
+        end_time = time.time()
+        latency_ms = (end_time - start_time) * 1000
+        
+        prompt_id = str(uuid.uuid4())
+        
+        # 4. step: create the prompt model
+        prompt_model = PromptDBModel(
+            promptID=prompt_id,
             userID=request.userID,
             projectID="default-project",
             inputPrompt=request.inputPrompt,
@@ -42,8 +51,13 @@ async def optimize_prompt(request: PromptInput):
             optimizedPrompts={"default": optimized_text},
             initialTokenSize=initial_tokens,
             finalTokenSizes={"default": final_tokens},
-            latencyMs={"default": 0.0} # now 0
+            latencyMs={"default": latency_ms}
         )
+        
+        # 5. step: save to firestore
+        prompt_model.set_to_firestore()
+        
+        return prompt_model
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -70,6 +84,109 @@ async def test_nebius_ai(request : dict):
         user_response = test_nebius_api(user_input, ai_model)
         
         return user_response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/history/{user_id}")
+async def get_prompt_history(user_id: str, limit: int = 50):
+    """
+    Get prompt history for a specific user
+    """
+    try:
+        db = get_firestore_client()
+        prompts_ref = db.collection("prompts")
+        # Query prompts for this user, order by createdAt descending
+        query = prompts_ref.where("userID", "==", user_id).limit(limit)
+        docs = query.stream()
+        
+        history = []
+        for doc in docs:
+            data = doc.to_dict()
+            # Handle timestamp conversion
+            created_at = data.get("createdAt")
+            if hasattr(created_at, 'isoformat'):
+                created_at = created_at.isoformat()
+            
+            history.append({
+                "id": data.get("promptID"),
+                "prompt": data.get("inputPrompt"),
+                "optimizedPrompt": data.get("optimizedPrompts", {}).get("default", ""),
+                "timestamp": created_at,
+                "tokenCount": data.get("initialTokenSize", 0),
+                "latency": data.get("latencyMs", {}).get("default", 0),
+            })
+        
+        # Sort by timestamp in Python (descending)
+        history.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+        
+        return {"status": "success", "history": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/prompt/{prompt_id}")
+async def delete_prompt(prompt_id: str):
+    """
+    Delete a prompt from history
+    """
+    try:
+        db = get_firestore_client()
+        prompt_ref = db.collection("prompts").document(prompt_id)
+        prompt_ref.delete()
+        return {"status": "success", "message": f"Prompt {prompt_id} deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/feedback")
+async def save_feedback(feedback_data: dict):
+    """
+    Save user feedback for a prompt
+    
+    Request body:
+    {
+        "promptID": "...",
+        "originalPrompt": "...",
+        "optimizedPrompt": "...",
+        "rating": 5,
+        "selectedLLM": "...",
+        "scoreWeights": {...},
+        "tokenCount": 100,
+        "latency": 1500
+    }
+    """
+    try:
+        db = get_firestore_client()
+        
+        # Save feedback to feedbacks collection
+        feedback_ref = db.collection("feedbacks").document()
+        feedback_data["feedbackID"] = feedback_ref.id
+        feedback_data["createdAt"] = firestore.SERVER_TIMESTAMP
+        feedback_ref.set(feedback_data)
+        
+        # Update prompt rating if promptID provided
+        if feedback_data.get("promptID"):
+            prompt_ref = db.collection("prompts").document(feedback_data["promptID"])
+            prompt_ref.update({
+                "ratings": {"user": feedback_data.get("rating", 0)}
+            })
+        
+        return {"status": "success", "feedbackID": feedback_ref.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/prompt/{prompt_id}/favorite")
+async def toggle_favorite(prompt_id: str, data: dict):
+    """
+    Toggle favorite status of a prompt
+    """
+    try:
+        db = get_firestore_client()
+        prompt_ref = db.collection("prompts").document(prompt_id)
+        prompt_ref.update({"isFavorite": data.get("isFavorite", False)})
+        return {"status": "success", "message": "Favorite status updated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

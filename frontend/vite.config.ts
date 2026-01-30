@@ -12,9 +12,12 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      // Alias @ to the src directory
-      '@': path.resolve(__dirname, './src'),
+      // Alias @ to the root frontend directory for app components
+      '@': path.resolve(__dirname, './'),
     },
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
   },
+  define: {
+    'process.env': process.env
+  }
 })

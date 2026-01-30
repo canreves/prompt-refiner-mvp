@@ -1,8 +1,7 @@
-
 import axios from 'axios';
 
-// Backend URL'i (Render'da REACT_APP_API_URL ile ayarlanır)
-const API_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/v1";
+// Backend URL (configured via VITE_API_URL environment variable)
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/v1";
 
 /**
  * Optimize a prompt using the backend AI service
@@ -21,7 +20,7 @@ export const optimizePromptService = async (userInput, userID = "default-user") 
     return response.data;
 
   } catch (error) {
-    console.error("Backend Hatası:", error);
+    console.error("Backend Error:", error);
     throw error;
   }
 };
@@ -107,7 +106,7 @@ export const createUserService = async (userData) => {
     return response.data;
 
   } catch (error) {
-    console.error("Kullanıcı oluşturma hatası:", error);
+    console.error("Create user error:", error);
     throw error;
   }
 };

@@ -1,20 +1,57 @@
 import { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { signIn, signUp } from '@/services/authService';
 
 interface LoginPageProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (user: { uid: string; email: string }) => void;
 }
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Direkt ana sayfaya geç
-    onLoginSuccess();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      let result;
+      if (isSignUp) {
+        result = await signUp(email, password);
+      } else {
+        result = await signIn(email, password);
+      }
+      
+      if (result.user) {
+        onLoginSuccess({
+          uid: result.user.uid,
+          email: result.user.email || email
+        });
+      }
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      // Handle specific Firebase auth errors
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email. Please sign up.');
+      } else if (err.code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('An account with this email already exists.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password should be at least 6 characters.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else {
+        setError(err.message || 'Authentication failed. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -89,10 +126,31 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition"
+              disabled={isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg transition"
             >
-              Sign In
+              {isLoading ? 'Please wait...' : (isSignUp ? 'Sign Up' : 'Sign In')}
             </button>
+
+            {/* Error Message */}
+            {error && (
+              <p className="text-red-500 text-sm text-center">{error}</p>
+            )}
+
+            {/* Toggle Sign Up / Sign In */}
+            <p className="text-center text-sm text-gray-600">
+              {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setError('');
+                }}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                {isSignUp ? 'Sign In' : 'Sign Up'}
+              </button>
+            </p>
           </form>
         </div>
 

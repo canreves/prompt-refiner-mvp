@@ -2,17 +2,6 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from datetime import datetime
 
-# Handle imports for both direct execution and module import
-import sys
-from pathlib import Path
-
-try:
-    from ..services.firebase_db import get_firestore_client
-except ImportError:
-    # Add parent directory to path when running directly
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from services.firebase_db import get_firestore_client
-
 
 class PromptInput(BaseModel):
     userID: str
@@ -75,6 +64,7 @@ class PromptDBModel(BaseModel):
         return data
     
     def set_to_firestore(self) -> str:
+        from services.firebase_db import get_firestore_client
         db = get_firestore_client()
         prompt_ref = db.collection("prompts").document(self.promptID)
         prompt_ref.set(self.to_firestore_dict())
@@ -83,6 +73,7 @@ class PromptDBModel(BaseModel):
         
     def delete_from_firestore(self) -> bool:
         try:
+            from services.firebase_db import get_firestore_client
             db = get_firestore_client()
             prompt_ref = db.collection("prompts").document(self.promptID)
             prompt_ref.delete()
@@ -92,6 +83,7 @@ class PromptDBModel(BaseModel):
         
     def update_in_firestore(self, update_data: dict) -> bool:
         try:
+            from services.firebase_db import get_firestore_client
             db = get_firestore_client()
             prompt_ref = db.collection("prompts").document(self.promptID)
             prompt_ref.update(update_data)

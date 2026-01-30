@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import prompt_router, user_router
+from routers import prompt_router, user_router, auth_router
 
 app = FastAPI(title="Prompt Refiner MVP", version="1.0")
 
@@ -15,6 +15,7 @@ app.add_middleware(
 
 
 # include router to the system
+app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(prompt_router.router, prefix="/api/v1", tags=["Prompts"])
 app.include_router(user_router.router, prefix="/api/v1", tags=["Users"])
 

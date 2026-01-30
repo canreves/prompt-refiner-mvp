@@ -19,8 +19,8 @@ class TokenVerifyRequest(BaseModel):
 class UserResponse(BaseModel):
     uid: str
     email: str
-    name: str | None = None
-    picture: str | None = None
+    name: str = None
+    picture: str = ""
     is_new_user: bool = False
 
 @router.post("/verify-token", response_model=UserResponse)

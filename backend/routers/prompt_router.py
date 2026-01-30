@@ -230,45 +230,11 @@ async def delete_prompt(prompt_id: str):
     Delete a prompt from history
     """
     try:
-        db = get_firestore_client()
-        prompt_ref = db.collection("prompts").document(prompt_id)
-        prompt_ref.delete()
+        prompt = PromptDBModel(promptID=prompt_id)
+        isSuccess = prompt.delete_from_firestore()
+        if not isSuccess:
+            raise HTTPException(status_code=404, detail="Prompt not found")
         return {"status": "success", "message": f"Prompt {prompt_id} deleted"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/feedback")
-async def save_feedback(feedback_data: dict):
-    """
-    Save user rating for a prompt (1-5)
-    
-    Request body:
-    {
-        "promptID": "...",
-        "rating": 5  // number between 1-5
-    }
-    """
-    try:
-        db = get_firestore_client()
-        
-        # Validate rating
-        rating = feedback_data.get("rating")
-        if not rating or not isinstance(rating, (int, float)) or rating < 1 or rating > 5:
-            raise HTTPException(status_code=400, detail="Rating must be a number between 1 and 5")
-        
-        # Update prompt with rating directly
-        if feedback_data.get("promptID"):
-            prompt_ref = db.collection("prompts").document(feedback_data["promptID"])
-            prompt_ref.update({
-                "ratings": {"user": int(rating)}
-            })
-            return {"status": "success", "promptID": feedback_data["promptID"]}
-        else:
-            raise HTTPException(status_code=400, detail="promptID is required")
-        
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -279,30 +245,9 @@ async def toggle_favorite(prompt_id: str, data: dict):
     Toggle favorite status of a prompt
     """
     try:
-        db = get_firestore_client()
-        prompt_ref = db.collection("prompts").document(prompt_id)
-        prompt_ref.update({"isFavorite": data.get("isFavorite", False)})
+        prompt = PromptDBModel(promptID=prompt_id, isFavorite=data.get("isFavorite", False))
+        prompt.toggle_favorite_in_firestore()
         return {"status": "success", "message": "Favorite status updated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/parsePrompt", response_model=dict)
-async def parse_prompt(request: PromptDBModel):
-    try:
-        start_time = time.perf_counter()
-        parsed_result = request.get_parsed_data_and_scores_from_llm_returns_score()
-        
-        optimized_result = request.optimize_new_prompt_with_llm()
-
-        process_time = time.perf_counter() - start_time
-
-        request.save_latency_to_firestore(process_time, optimized_result["optimizedPromptID"])
-        
-        return {
-            "parsedData": parsed_result,
-            "optimizedPrompt": optimized_result,
-            "processTime" : process_time
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

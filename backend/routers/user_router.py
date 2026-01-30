@@ -75,7 +75,6 @@ async def create_user(user_data: dict):
             email=user_data["email"],
             profileImageURL=user_data.get("profileImageURL"),
             createdAt=datetime.now(),
-            last50Prompts=[],
             projectIDs=[]
         )
         
@@ -152,6 +151,39 @@ async def login(user_data: dict):
             "token_type": "bearer"
         }
  
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{user_id}/addProject", response_model=dict)
+async def add_project_to_user(user_id: str, project_name: str):
+    """
+    Add a new project to the user's project list.
+    
+    Request body:
+    {
+        "project_name": "New Project"
+    }
+    """
+    try:
+        user = User.get_user_from_firestore(user_id)
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        project_id = user.add_new_project(project_name, user_id)
+        
+        if not project_id:
+            raise HTTPException(status_code=500, detail="Failed to add project")
+        
+        return {
+            "status": "success",
+            "projectID": project_id,
+            "message": f"Project '{project_name}' added successfully to user '{user.username}'"
+        }
+        
     except HTTPException:
         raise
     except Exception as e:

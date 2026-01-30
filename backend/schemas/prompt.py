@@ -58,10 +58,10 @@ class ParsedPrompt(BaseModel):
 
 # 2. prompt object data to be stored in firestore
 class PromptDBModel(BaseModel):
-    promptID: str
-    userID: str
-    projectID: str
-    inputPrompt: str
+    promptID: str = ""
+    userID: str = ""
+    projectID: str = "default-project"
+    inputPrompt: str = ""
 
     parsedData: Optional[ParsedPrompt] = None  # role, task, context
     optimizedPrompts: Optional[Dict[str, str]] = {}
@@ -250,6 +250,22 @@ class PromptDBModel(BaseModel):
             return True
         except:
             return False       
+
+    def toggle_favorite_in_firestore(self) -> bool:
+        try:
+            self.isFavorite = not self.isFavorite
+
+            db = get_firestore_client()
+            prompt_ref = db.collection("prompts").document(self.promptID)
+            prompt_ref.update(
+                {
+                    "isFavorite" : self.isFavorite
+                }
+            )
+            
+            return True
+        except:
+            return False
     
     @staticmethod
     def get_prompt_from_firestore(prompt_id: str) -> Optional["PromptDBModel"]:

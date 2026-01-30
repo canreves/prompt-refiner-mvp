@@ -244,6 +244,7 @@ export default function App() {
               optimizedPrompt={optimizedPrompt}
               tokenCount={tokenCount}
               latency={latency}
+              promptId={currentPromptID}
               onRate={handleRate}
             />
           )}

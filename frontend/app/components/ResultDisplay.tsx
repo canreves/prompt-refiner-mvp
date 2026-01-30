@@ -7,10 +7,11 @@ interface ResultDisplayProps {
   optimizedPrompt: string;
   tokenCount: number;
   latency: number;
+  promptId?: string | null;
   onRate?: (rating: number) => void;
 }
 
-export function ResultDisplay({ originalPrompt, optimizedPrompt, tokenCount, latency, onRate }: ResultDisplayProps) {
+export function ResultDisplay({ originalPrompt, optimizedPrompt, tokenCount, latency, promptId, onRate }: ResultDisplayProps) {
   const [copiedOriginal, setCopiedOriginal] = useState(false);
   const [copiedOptimized, setCopiedOptimized] = useState(false);
 
@@ -102,7 +103,7 @@ export function ResultDisplay({ originalPrompt, optimizedPrompt, tokenCount, lat
       {onRate && (
         <div className="mt-6">
           <h3 className="text-base font-semibold text-gray-900 mb-3">Rating</h3>
-          <RatingStars onRate={onRate} />
+          <RatingStars key={promptId || 'no-prompt'} onRate={onRate} />
         </div>
       )}
     </div>

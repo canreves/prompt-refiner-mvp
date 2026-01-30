@@ -1,4 +1,3 @@
-from argon2 import verify_password
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime
@@ -11,6 +10,7 @@ from pathlib import Path
  
 try:
     from ..schemas.user import User
+    from ..services.firebase_db import get_firestore_client
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -28,6 +28,22 @@ class UserCreateRequest:
         self.username = username
         self.email = email
         self.profileImageURL = profileImageURL
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Secret key for JWT
+SECRET_KEY = "your_secret_key"
+ALGORITHM = "HS256"
+
+# Helper functions
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+ 
+def get_password_hash(password):
+    return pwd_context.hash(password)
+ 
+def create_access_token(data: dict):
+    return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
 
 @router.post("/create", response_model=dict)
 async def create_user(user_data: dict):
@@ -59,7 +75,6 @@ async def create_user(user_data: dict):
             email=user_data["email"],
             profileImageURL=user_data.get("profileImageURL"),
             createdAt=datetime.now(),
-            last50Prompts=[],
             projectIDs=[]
         )
         
@@ -136,6 +151,39 @@ async def login(user_data: dict):
             "token_type": "bearer"
         }
  
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{user_id}/addProject", response_model=dict)
+async def add_project_to_user(user_id: str, project_name: str):
+    """
+    Add a new project to the user's project list.
+    
+    Request body:
+    {
+        "project_name": "New Project"
+    }
+    """
+    try:
+        user = User.get_user_from_firestore(user_id)
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        project_id = user.add_new_project(project_name, user_id)
+        
+        if not project_id:
+            raise HTTPException(status_code=500, detail="Failed to add project")
+        
+        return {
+            "status": "success",
+            "projectID": project_id,
+            "message": f"Project '{project_name}' added successfully to user '{user.username}'"
+        }
+        
     except HTTPException:
         raise
     except Exception as e:

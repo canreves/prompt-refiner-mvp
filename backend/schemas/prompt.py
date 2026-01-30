@@ -12,11 +12,13 @@ from pathlib import Path
 try:    
     from ..services.nebius_ai import run_nebius_ai
     from ..services.firebase_db import get_firestore_client
+    from ..services.token_counter import count_tokens
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from services.firebase_db import get_firestore_client
-    from services.nebius_ai import run_nebius_ai    
+    from services.nebius_ai import run_nebius_ai
+    from services.token_counter import count_tokens    
 
 
 class PromptInput(BaseModel):
@@ -172,7 +174,7 @@ class PromptDBModel(BaseModel):
         if isinstance(content, str):
             content = json.loads(content)
         self.parsedData = ParsedPrompt(**content)
-        self.initialTokenSize = response.get("usage").get("completion_tokens", 0) 
+        self.initialTokenSize = count_tokens(self.inputPrompt) 
         
         # Calculate overall score
         total_weight = sum(weights.values())
@@ -215,7 +217,7 @@ class PromptDBModel(BaseModel):
         optimized_prompt = response["choices"][0]["message"]["content"]
         new_optimized_id = str(uuid.uuid4())
         self.optimizedPrompts[new_optimized_id] = optimized_prompt
-        self.finalTokenSizes[new_optimized_id] = response.get("usage").get("completion_tokens", 0)
+        self.finalTokenSizes[new_optimized_id] = count_tokens(optimized_prompt)
         self.usedLLMs[new_optimized_id] = ai_model
         
         return {

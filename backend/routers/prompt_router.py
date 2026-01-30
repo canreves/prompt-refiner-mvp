@@ -1,4 +1,4 @@
-from time import time
+from time import perf_counter
 from fastapi import APIRouter, HTTPException
 
 
@@ -28,7 +28,7 @@ async def parse_only(request: PromptInput):
     Returns parsed data, scores, and promptID for later optimization.
     """
     try:
-        start_time = time()
+        start_time = perf_counter()
         
         # Create prompt model
         prompt_model = PromptDBModel(
@@ -41,7 +41,7 @@ async def parse_only(request: PromptInput):
         # Parse and analyze
         parsed_result = prompt_model.get_parsed_data_and_scores_from_llm_returns_score()
         
-        end_time = time()
+        end_time = perf_counter()
         parse_latency = (end_time - start_time) * 1000
         
         # Save to Firestore with parsed data only
@@ -69,7 +69,7 @@ async def optimize_existing(prompt_id: str, weights: dict = None, ai_model: str 
     try:
         from services.firebase_db import get_firestore_client
         
-        start_time = time()
+        start_time = perf_counter()
         
         # Load prompt from Firestore
         prompt_model = PromptDBModel.get_prompt_from_firestore(prompt_id)
@@ -82,7 +82,7 @@ async def optimize_existing(prompt_id: str, weights: dict = None, ai_model: str 
         else:
             optimized_result = prompt_model.optimize_new_prompt_with_llm(ai_model=ai_model)
         
-        end_time = time()
+        end_time = perf_counter()
         optimize_latency = (end_time - start_time) * 1000
         
         # Save latency to Firestore
@@ -117,7 +117,7 @@ async def optimize_prompt(request: PromptInput, weights: dict = None, ai_model: 
     For quick optimization without UI interaction between steps.
     """
     try:
-        total_start = time()
+        total_start = perf_counter()
         
         # Create prompt model
         prompt_model = PromptDBModel(
@@ -128,16 +128,16 @@ async def optimize_prompt(request: PromptInput, weights: dict = None, ai_model: 
         )
         
         # Step 1: Parse
-        parse_start = time()
+        parse_start = perf_counter()
         parsed_result = prompt_model.get_parsed_data_and_scores_from_llm_returns_score(weights or {})
-        parse_latency = (time() - parse_start) * 1000
+        parse_latency = (perf_counter() - parse_start) * 1000
         
         # Step 2: Optimize
-        optimize_start = time()
+        optimize_start = perf_counter()
         optimized_result = prompt_model.optimize_new_prompt_with_llm(ai_model=ai_model, weights=weights or {})
-        optimize_latency = (time() - optimize_start) * 1000
+        optimize_latency = (perf_counter() - optimize_start) * 1000
         
-        total_latency = (time() - total_start) * 1000
+        total_latency = (perf_counter() - total_start) * 1000
         
         # Save latency
         prompt_model.save_latency_to_firestore(optimize_latency, optimized_result["optimizedPromptID"])
@@ -290,12 +290,12 @@ async def toggle_favorite(prompt_id: str, data: dict):
 @router.post("/parsePrompt", response_model=dict)
 async def parse_prompt(request: PromptDBModel):
     try:
-        start_time = time.perf_counter()
+        start_time = perf_counter()
         parsed_result = request.get_parsed_data_and_scores_from_llm_returns_score()
         
         optimized_result = request.optimize_new_prompt_with_llm()
 
-        process_time = time.perf_counter() - start_time
+        process_time = perf_counter() - start_time
 
         request.save_latency_to_firestore(process_time, optimized_result["optimizedPromptID"])
         

@@ -8,4 +8,3 @@ passlib[jwt]
 passlib
 bcrypt
 pyjwt
-argon2

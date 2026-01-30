@@ -1,4 +1,4 @@
-from time import perf_counter as time
+from time import time
 from fastapi import APIRouter, HTTPException
 
 

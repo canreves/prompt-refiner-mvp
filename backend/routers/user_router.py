@@ -17,6 +17,7 @@ except ImportError:
     from schemas.user import User
     from services.firebase_db import get_firestore_client
     
+
 router = APIRouter()
 
 class UserCreateRequest:
@@ -113,7 +114,6 @@ async def get_user(user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
- 
 @router.post("/login")
 async def login(user_data: dict):
     """
@@ -155,7 +155,7 @@ async def login(user_data: dict):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 
 @router.post("/{user_id}/addProject", response_model=dict)
 async def add_project_to_user(user_id: str, project_name: str):

@@ -1,3 +1,4 @@
+from argon2 import verify_password
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime

@@ -1,5 +1,4 @@
-
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from datetime import datetime
 
 import uuid
@@ -24,7 +23,7 @@ class User:
     surname : str = ""
     username : str = ""
     createdAt : datetime = datetime.now()
-    last50Prompts : List[PromptDBModel] = []  # list of promptIDs
+    last50Prompts : List[Any] = []  # list of prompt objects or IDs
     email : str = ""
     profileImageURL : Optional[str] = None
     projectIDs : List[Dict[str, str]] = []  # list of {projectID, projectName} dictionaries
@@ -35,13 +34,21 @@ class User:
     
 
     def to_firestore_dict(self) -> dict:
+        # Handle last50Prompts - could be prompt objects or just IDs
+        prompts_list = []
+        for prompt in self.last50Prompts:
+            if hasattr(prompt, 'promptID'):
+                prompts_list.append(prompt.promptID)
+            else:
+                prompts_list.append(str(prompt))
+        
         data = {
             "userID": self.userID,
             "name": self.name,
             "surname": self.surname,
             "username": self.username,
             "createdAt": self.createdAt,
-            "last50Prompts": [prompt.promptID for prompt in self.last50Prompts],
+            "last50Prompts": prompts_list,
             "email": self.email,
             "profileImageURL": self.profileImageURL,
             "projectIDs": self.projectIDs
@@ -50,6 +57,7 @@ class User:
     
     def save_to_firestore(self) -> str:
         try:
+            from services.firebase_db import get_firestore_client
             db = get_firestore_client()
             user_ref = db.collection("users").document(self.userID)
             user_ref.set(self.to_firestore_dict())
@@ -60,6 +68,7 @@ class User:
     
     def update_in_firestore(self) -> bool:
         try:
+            from services.firebase_db import get_firestore_client
             db = get_firestore_client()
             user_ref = db.collection("users").document(self.userID)
             user_ref.update(self.to_firestore_dict())
@@ -83,6 +92,7 @@ class User:
 
     @staticmethod
     def get_user_from_firestore(user_id: str) -> Optional["User"]:
+        from services.firebase_db import get_firestore_client
         db = get_firestore_client()
         user_ref = db.collection("users").document(user_id)
         doc = user_ref.get()

@@ -1,19 +1,24 @@
+import json
+import uuid
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-import uuid
-import json
+
 # Handle imports for both direct execution and module import
 import sys
 from pathlib import Path
 
-try:
-    from ..services.firebase_db import get_firestore_client
+
+try:    
     from ..services.nebius_ai import run_nebius_ai
+    from ..services.firebase_db import get_firestore_client
+    from ..services.token_counter import count_tokens
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from services.firebase_db import get_firestore_client
     from services.nebius_ai import run_nebius_ai
+    from services.token_counter import count_tokens    
 
 
 class PromptInput(BaseModel):
@@ -103,6 +108,7 @@ class PromptDBModel(BaseModel):
         return data
     
     def set_to_firestore(self) -> str:
+        from services.firebase_db import get_firestore_client
         db = get_firestore_client()
         prompt_ref = db.collection("prompts").document(self.promptID)
         prompt_ref.set(self.to_firestore_dict())
@@ -111,6 +117,7 @@ class PromptDBModel(BaseModel):
         
     def delete_from_firestore(self) -> bool:
         try:
+            from services.firebase_db import get_firestore_client
             db = get_firestore_client()
             prompt_ref = db.collection("prompts").document(self.promptID)
             prompt_ref.delete()
@@ -120,6 +127,7 @@ class PromptDBModel(BaseModel):
         
     def update_in_firestore(self, update_data: dict) -> bool:
         try:
+            from services.firebase_db import get_firestore_client
             db = get_firestore_client()
             prompt_ref = db.collection("prompts").document(self.promptID)
             prompt_ref.update(update_data)
@@ -166,7 +174,7 @@ class PromptDBModel(BaseModel):
         if isinstance(content, str):
             content = json.loads(content)
         self.parsedData = ParsedPrompt(**content)
-        self.initialTokenSize = response.get("usage").get("completion_tokens", 0) 
+        self.initialTokenSize = count_tokens(self.inputPrompt) 
         
         # Calculate overall score
         total_weight = sum(weights.values())
@@ -209,7 +217,7 @@ class PromptDBModel(BaseModel):
         optimized_prompt = response["choices"][0]["message"]["content"]
         new_optimized_id = str(uuid.uuid4())
         self.optimizedPrompts[new_optimized_id] = optimized_prompt
-        self.finalTokenSizes[new_optimized_id] = response.get("usage").get("completion_tokens", 0)
+        self.finalTokenSizes[new_optimized_id] = count_tokens(optimized_prompt)
         self.usedLLMs[new_optimized_id] = ai_model
         
         return {
@@ -269,6 +277,7 @@ class PromptDBModel(BaseModel):
     
     @staticmethod
     def get_prompt_from_firestore(prompt_id: str) -> Optional["PromptDBModel"]:
+        from services.firebase_db import get_firestore_client
         db = get_firestore_client()
         prompt_ref = db.collection("prompts").document(prompt_id)
         doc = prompt_ref.get()

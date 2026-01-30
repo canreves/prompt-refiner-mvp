@@ -2,6 +2,8 @@
 from typing import Optional, Dict, List
 from datetime import datetime
 
+import uuid
+
 # Handle imports for both direct execution and module import
 import sys
 from pathlib import Path
@@ -64,6 +66,20 @@ class User:
             return True
         except Exception as e:
             return False
+    
+    def add_new_project(self, project_name: str, user_id: str) -> str:
+        try:
+            db = get_firestore_client()
+            project_id = str(uuid.uuid4())
+            project_entry = {"projectID": project_id, "projectName": project_name}
+            self.projectIDs.append(project_entry)
+
+            user_ref = db.collection("users").document(user_id)
+            user_ref.update({"projectIDs": self.projectIDs})
+
+            return project_id
+        except Exception as e:
+            return ""
 
     @staticmethod
     def get_user_from_firestore(user_id: str) -> Optional["User"]:
@@ -75,4 +91,5 @@ class User:
             return User(**data)
         else:
             return None
+    
     

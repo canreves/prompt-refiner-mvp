@@ -1,5 +1,6 @@
+from time import time
 from fastapi import APIRouter, HTTPException
-import time
+
 
 # from schemas.prompt import PromptInput, PromptDBModel
 import sys
@@ -7,32 +8,156 @@ from pathlib import Path
 
 try:
     from ..schemas.prompt import PromptDBModel, PromptInput
-    from ..services.nebius_ai import test_nebius_api
-    
+    from ..services.nebius_ai import  test_nebius_api
+    from ..services.firebase_db import get_firestore_client
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from schemas.prompt import PromptDBModel, PromptInput
     from services.nebius_ai import test_nebius_api
-
+    from services.firebase_db import get_firestore_client
+    
+import uuid
 
 router = APIRouter()
 
-@router.post("/optimize", response_model=PromptDBModel)
-async def optimize_prompt(request: PromptDBModel):
+@router.post("/parse", response_model=dict)
+async def parse_only(request: PromptInput):
+    """
+    Step 1: Parse and analyze a prompt without optimization.
+    Returns parsed data, scores, and promptID for later optimization.
+    """
     try:
-        # 1. step: analyze prompt (parsing)
+        start_time = time()
         
-        # 2. step: optimize it
-        optimized_text = request.optimize_new_prompt_with_llm()
+        # Create prompt model
+        prompt_model = PromptDBModel(
+            promptID=str(uuid.uuid4()),
+            userID=request.userID,
+            projectID="default-project",
+            inputPrompt=request.inputPrompt,
+        )
         
-        # 3. step: calculate metrics
-        initial_tokens = len(request.inputPrompt.split())
-        final_tokens = len(optimized_text.split())
+        # Parse and analyze
+        parsed_result = prompt_model.get_parsed_data_and_scores_from_llm_returns_score()
         
-        # 4. step: return the answers
-        return request
+        end_time = time()
+        parse_latency = (end_time - start_time) * 1000
         
+        # Save to Firestore with parsed data only
+        prompt_model.set_to_firestore()
+        
+        return {
+            "status": "success",
+            "promptID": prompt_model.promptID,
+            "parsedData": parsed_result.get("parsedData"),
+            "overallScores": parsed_result.get("overallScores"),
+            "completionTokens": parsed_result.get("completionTokens"),
+            "promptTokens": parsed_result.get("promptTokens"),
+            "parseLatencyMs": parse_latency
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimizeExisting/{prompt_id}", response_model=dict)
+async def optimize_existing(prompt_id: str, weights: dict = None, ai_model: str = "openai/gpt-oss-20b"):
+    """
+    Step 2: Optimize an already-parsed prompt.
+    Takes a promptID from /parse endpoint and generates optimized version.
+    """
+    try:
+        from services.firebase_db import get_firestore_client
+        
+        start_time = time()
+        
+        # Load prompt from Firestore
+        prompt_model = PromptDBModel.get_prompt_from_firestore(prompt_id)
+        if not prompt_model:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+        
+        # Optimize with optional weights
+        if weights:
+            optimized_result = prompt_model.optimize_new_prompt_with_llm(ai_model=ai_model, weights=weights)
+        else:
+            optimized_result = prompt_model.optimize_new_prompt_with_llm(ai_model=ai_model)
+        
+        end_time = time()
+        optimize_latency = (end_time - start_time) * 1000
+        
+        # Save latency to Firestore
+        prompt_model.save_latency_to_firestore(optimize_latency, optimized_result["optimizedPromptID"])
+        
+        # Update Firestore with optimized data
+        prompt_model.update_in_firestore({
+            "optimizedPrompts": prompt_model.optimizedPrompts,
+            "finalTokenSizes": prompt_model.finalTokenSizes,
+            "usedLLMs": prompt_model.usedLLMs
+        })
+        
+        return {
+            "status": "success",
+            "promptID": prompt_id,
+            "optimizedPromptID": optimized_result["optimizedPromptID"],
+            "optimizedPrompt": optimized_result["optimizedPrompt"],
+            "finalTokenSize": optimized_result["finalTokenSize"],
+            "usedLLM": optimized_result["usedLLM"],
+            "optimizeLatencyMs": optimize_latency
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimize", response_model=dict)
+async def optimize_prompt(request: PromptInput, weights: dict = None, ai_model: str = "openai/gpt-oss-20b"):
+    """
+    Combined workflow: Parse and optimize in one request.
+    For quick optimization without UI interaction between steps.
+    """
+    try:
+        total_start = time()
+        
+        # Create prompt model
+        prompt_model = PromptDBModel(
+            promptID=str(uuid.uuid4()),
+            userID=request.userID,
+            projectID="default-project",
+            inputPrompt=request.inputPrompt,
+        )
+        
+        # Step 1: Parse
+        parse_start = time()
+        parsed_result = prompt_model.get_parsed_data_and_scores_from_llm_returns_score(weights or {})
+        parse_latency = (time() - parse_start) * 1000
+        
+        # Step 2: Optimize
+        optimize_start = time()
+        optimized_result = prompt_model.optimize_new_prompt_with_llm(ai_model=ai_model, weights=weights or {})
+        optimize_latency = (time() - optimize_start) * 1000
+        
+        total_latency = (time() - total_start) * 1000
+        
+        # Save latency
+        prompt_model.save_latency_to_firestore(optimize_latency, optimized_result["optimizedPromptID"])
+        
+        # Save to Firestore
+        prompt_model.set_to_firestore()
+        
+        return {
+            "status": "success",
+            "promptID": prompt_model.promptID,
+            "parsedData": parsed_result.get("parsedData"),
+            "overallScores": parsed_result.get("overallScores"),
+            "optimizedPromptID": optimized_result["optimizedPromptID"],
+            "optimizedPrompt": optimized_result["optimizedPrompt"],
+            "initialTokenSize": parsed_result.get("completionTokens"),
+            "finalTokenSize": optimized_result["finalTokenSize"],
+            "parseLatencyMs": parse_latency,
+            "optimizeLatencyMs": optimize_latency,
+            "totalLatencyMs": total_latency
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
@@ -62,23 +187,67 @@ async def test_nebius_ai(request : dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/parsePrompt", response_model=dict)
-async def parse_prompt(request: PromptDBModel):
+@router.get("/history/{user_id}")
+async def get_prompt_history(user_id: str, limit: int = 50):
+    """
+    Get prompt history for a specific user
+    """
     try:
-        start_time = time.perf_counter()
-        parsed_result = request.get_parsed_data_and_scores_from_llm_returns_score()
+        db = get_firestore_client()
+        prompts_ref = db.collection("prompts")
+        # Query prompts for this user, order by createdAt descending
+        query = prompts_ref.where("userID", "==", user_id).limit(limit)
+        docs = query.stream()
         
-        optimized_result = request.optimize_new_prompt_with_llm()
-
-        process_time = time.perf_counter() - start_time
-
-        request.save_latency_to_firestore(process_time, optimized_result["optimizedPromptID"])
+        history = []
+        for doc in docs:
+            data = doc.to_dict()
+            # Handle timestamp conversion
+            created_at = data.get("createdAt")
+            if hasattr(created_at, 'isoformat'):
+                created_at = created_at.isoformat()
+            
+            history.append({
+                "id": data.get("promptID"),
+                "prompt": data.get("inputPrompt"),
+                "optimizedPrompt": data.get("optimizedPrompts", {}).get("default", ""),
+                "timestamp": created_at,
+                "tokenCount": data.get("initialTokenSize", 0),
+                "latency": data.get("latencyMs", {}).get("default", 0),
+            })
         
-        return {
-            "parsedData": parsed_result,
-            "optimizedPrompt": optimized_result,
-            "processTime" : process_time
-        }
+        # Sort by timestamp in Python (descending)
+        history.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+        
+        return {"status": "success", "history": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/prompt/{prompt_id}")
+async def delete_prompt(prompt_id: str):
+    """
+    Delete a prompt from history
+    """
+    try:
+        prompt = PromptDBModel(promptID=prompt_id)
+        isSuccess = prompt.delete_from_firestore()
+        if not isSuccess:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+        return {"status": "success", "message": f"Prompt {prompt_id} deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/prompt/{prompt_id}/favorite")
+async def toggle_favorite(prompt_id: str, data: dict):
+    """
+    Toggle favorite status of a prompt
+    """
+    try:
+        prompt = PromptDBModel(promptID=prompt_id, isFavorite=data.get("isFavorite", False))
+        prompt.toggle_favorite_in_firestore()
+        return {"status": "success", "message": "Favorite status updated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

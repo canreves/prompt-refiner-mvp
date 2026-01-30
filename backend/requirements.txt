@@ -4,4 +4,7 @@ python-dotenv
 firebase-admin
 openai
 pydantic
+passlib[jwt]
 passlib
+bcrypt
+pyjwt

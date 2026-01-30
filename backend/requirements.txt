@@ -1,10 +1,12 @@
 fastapi
 uvicorn
+gunicorn
 python-dotenv
 firebase-admin
 openai
 pydantic
-passlib[jwt]
-passlib
 bcrypt
 pyjwt
+passlib
+passlib[jwt]
+tiktoken

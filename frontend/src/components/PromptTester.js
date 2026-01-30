@@ -17,12 +17,12 @@ const PromptTester = () => {
     try {
       // 2. Servisi çağır (Backend'e git)
       const data = await optimizePromptService(input);
-      
+
       // 3. Gelen cevabı kaydet
-      setResult(data); 
+      setResult(data);
     } catch (err) {
       // 4. Hata varsa kaydet
-      setError("Backend'e bağlanılamadı! Kaptan'a haber ver.");
+      setError("Backend'e bağlanılamadı!");
     } finally {
       // 5. İşlem bitti, yükleniyor modunu kapat
       setLoading(false);
@@ -32,22 +32,22 @@ const PromptTester = () => {
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
       <h2>⚡ Prompt Optimizer Test</h2>
-      
+
       {/* Input Alanı */}
-      <textarea 
-        rows="4" 
+      <textarea
+        rows="4"
         cols="50"
         placeholder="Promptunuzu buraya yazın..."
         value={input}
         onChange={(e) => setInput(e.target.value)}
         disabled={loading} // Yüklenirken yazılamasın
       />
-      
+
       <br /><br />
 
       {/* Gönder Butonu */}
-      <button 
-        onClick={handleOptimize} 
+      <button
+        onClick={handleOptimize}
         disabled={loading || !input} // Yüklenirken veya boşken tıklanmasın
         style={{ padding: "10px 20px", cursor: "pointer", backgroundColor: loading ? "#ccc" : "#007bff", color: "white" }}
       >
@@ -58,7 +58,7 @@ const PromptTester = () => {
 
       {/* Durum Göstergeleri */}
       {loading && <p style={{ color: "blue" }}>⏳ Yapay zeka düşünüyor, lütfen bekleyin...</p>}
-      
+
       {error && <p style={{ color: "red" }}>❌ {error}</p>}
 
       {/* Sonuç Alanı */}
@@ -67,7 +67,7 @@ const PromptTester = () => {
           <h3>✅ Sonuç Geldi:</h3>
           <p><strong>Optimize Edilmiş Prompt:</strong></p>
           <p style={{ fontStyle: "italic" }}>{result.optimized_prompt}</p>
-          
+
           <p><small>Token Değişimi: {result.metrics?.initial_tokens} -> {result.metrics?.final_tokens}</small></p>
         </div>
       )}

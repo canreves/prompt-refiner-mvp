@@ -69,7 +69,7 @@ async def create_user(user_data: dict):
         
         # Create user instance with generated ID
         user = User(
-            userID=str(uuid.uuid4()),
+            userID=user_data.get("userID", str(uuid.uuid4())),
             name=user_data["name"],
             surname=user_data["surname"],
             username=user_data["username"],
@@ -81,7 +81,7 @@ async def create_user(user_data: dict):
         )
         
         # Save to Firebase
-        user_id = save_user_to_firestore(user)
+        user_id = user.save_to_firestore()
         
         return {
             "status": "success",
@@ -100,16 +100,14 @@ async def get_user(user_id: str):
     Retrieve user information by user ID
     """
     try:
-        from services.firebase_db import get_firestore_client
-        db = get_firestore_client()
-        user_doc = db.collection("users").document(user_id).get()
-        
-        if not user_doc.exists:
-            raise HTTPException(status_code=404, detail=f"User with ID {user_id} not found")
+        user_doc = User.get_user_from_firestore(user_id)
+    
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
         
         return {
             "status": "success",
-            "user": user_doc.to_dict()
+            "user": user_doc.to_firestore_dict()
         }
         
     except HTTPException:

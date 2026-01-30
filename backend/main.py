@@ -15,6 +15,7 @@ app.add_middleware(
 
 
 # include router to the system
+app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(prompt_router.router, prefix="/api/v1", tags=["Prompts"])
 app.include_router(user_router.router, prefix="/api/v1", tags=["Users"])
 app.include_router(auth_router.router, prefix="/api/v1", tags=["Auth"])

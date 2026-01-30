@@ -219,7 +219,37 @@ class PromptDBModel(BaseModel):
             "usedLLM": ai_model
         }
 
+    def save_rating_to_firestore(self, rating: float, optimizedPromptID : str) -> bool:
+        try:
+            self.ratings[optimizedPromptID] = rating
 
+            db = get_firestore_client()
+            prompt_ref = db.collection("prompts").document(self.promptID)
+            prompt_ref.update(
+                {
+                    "ratings" : self.ratings
+                }
+            )
+            
+            return True
+        except:
+            return False
+
+    def save_latency_to_firestore(self, latency, optimizedPromptID : str) -> bool:
+        try:
+            self.latencyMs[optimizedPromptID] = latency
+
+            db = get_firestore_client()
+            prompt_ref = db.collection("prompts").document(self.promptID)
+            prompt_ref.update(
+                {
+                    "latencyMs" : self.latencyMs
+                }
+            )
+            
+            return True
+        except:
+            return False       
     
     @staticmethod
     def get_prompt_from_firestore(prompt_id: str) -> Optional["PromptDBModel"]:

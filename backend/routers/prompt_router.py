@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-
+import time
 
 # from schemas.prompt import PromptInput, PromptDBModel
 import sys
@@ -65,12 +65,20 @@ async def test_nebius_ai(request : dict):
 @router.post("/parsePrompt", response_model=dict)
 async def parse_prompt(request: PromptDBModel):
     try:
+        start_time = time.perf_counter()
         parsed_result = request.get_parsed_data_and_scores_from_llm_returns_score()
         
         optimized_result = request.optimize_new_prompt_with_llm()
+
+        process_time = time.perf_counter() - start_time
+
+        request.save_latency_to_firestore(process_time, optimized_result["optimizedPromptID"])
+        
         return {
             "parsedData": parsed_result,
-            "optimizedPrompt": optimized_result
+            "optimizedPrompt": optimized_result,
+            "processTime" : process_time
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

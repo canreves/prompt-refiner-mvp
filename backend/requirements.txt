@@ -4,3 +4,4 @@ python-dotenv
 firebase-admin
 openai
 pydantic
+passlib

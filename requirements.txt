@@ -6,6 +6,7 @@ firebase-admin
 openai
 pydantic
 bcrypt
-passlib[jwt]
 pyjwt
 passlib
+passlib[jwt]
+tiktoken

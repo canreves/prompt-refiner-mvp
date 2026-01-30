@@ -24,6 +24,7 @@ def count(prompt, encoding=default_enc):
     }
     return prompt_data
 
+#example
 prompt = "can you please explain to me some linear algebra"
 data = count(prompt)
 print(data)

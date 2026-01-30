@@ -14,8 +14,6 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from schemas.prompt import PromptDBModel, PromptInput
     from services.nebius_ai import test_nebius_api
-    
-import uuid
 
 
 router = APIRouter()

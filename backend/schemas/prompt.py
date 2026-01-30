@@ -93,6 +93,7 @@ class PromptDBModel(BaseModel):
     
     @staticmethod
     def get_prompt_from_firestore(prompt_id: str) -> Optional["PromptDBModel"]:
+        from services.firebase_db import get_firestore_client
         db = get_firestore_client()
         prompt_ref = db.collection("prompts").document(prompt_id)
         doc = prompt_ref.get()

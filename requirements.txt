@@ -8,3 +8,4 @@ pydantic
 bcrypt
 passlib[jwt]
 pyjwt
+tiktoken

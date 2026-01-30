@@ -7,43 +7,31 @@ from pathlib import Path
 
 try:
     from ..schemas.prompt import PromptDBModel, PromptInput
-    from ..services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius, test_nebius_api
+    from ..services.nebius_ai import test_nebius_api
     
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from schemas.prompt import PromptDBModel, PromptInput
-    from services.nebius_ai import parse_prompt_with_nebius, optimize_prompt_with_nebius, test_nebius_api
-    
-import uuid
+    from services.nebius_ai import test_nebius_api
+
 
 router = APIRouter()
 
 @router.post("/optimize", response_model=PromptDBModel)
-async def optimize_prompt(request: PromptInput):
+async def optimize_prompt(request: PromptDBModel):
     try:
         # 1. step: analyze prompt (parsing)
-        parsed_result = parse_prompt_with_nebius(request.inputPrompt)
         
         # 2. step: optimize it
-        optimized_text = optimize_prompt_with_nebius(parsed_result, request.inputPrompt)
+        optimized_text = request.optimize_new_prompt_with_llm()
         
         # 3. step: calculate metrics
         initial_tokens = len(request.inputPrompt.split())
         final_tokens = len(optimized_text.split())
         
         # 4. step: return the answers
-        return PromptDBModel(
-            promptID=str(uuid.uuid4()),
-            userID=request.userID,
-            projectID="default-project",
-            inputPrompt=request.inputPrompt,
-            parsedData=parsed_result,
-            optimizedPrompts={"default": optimized_text},
-            initialTokenSize=initial_tokens,
-            finalTokenSizes={"default": final_tokens},
-            latencyMs={"default": 0.0} # now 0
-        )
+        return request
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -74,4 +62,15 @@ async def test_nebius_ai(request : dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
+@router.post("/parsePrompt", response_model=dict)
+async def parse_prompt(request: PromptDBModel):
+    try:
+        parsed_result = request.get_parsed_data_and_scores_from_llm_returns_score()
+        
+        optimized_result = request.optimize_new_prompt_with_llm()
+        return {
+            "parsedData": parsed_result,
+            "optimizedPrompt": optimized_result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

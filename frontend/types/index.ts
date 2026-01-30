@@ -4,10 +4,17 @@
 
 export interface ParsedPrompt {
   role?: string | null;
+  role_score?: number | null;
   task?: string | null;
+  task_score?: number | null;
   context?: string | null;
+  context_score?: number | null;
   style?: string | null;
+  style_score?: number | null;
   output?: string | null;
+  output_score?: number | null;
+  rules?: string | null;
+  rules_score?: number | null;
 }
 
 export interface PromptInput {
@@ -83,13 +90,37 @@ export interface TokenVerifyResponse {
 // ============== API Response Types ==============
 
 export interface OptimizeResponse {
+  status: string;
   promptID: string;
-  optimizedPrompts: Record<string, string>;
   parsedData: ParsedPrompt;
-  overallScores: Record<string, number>;
-  latencyMs: Record<string, number>;
+  overallScores: number;
+  optimizedPromptID: string;
+  optimizedPrompt: string;
   initialTokenSize: number;
-  finalTokenSizes: Record<string, number>;
+  finalTokenSize: number;
+  parseLatencyMs: number;
+  optimizeLatencyMs: number;
+  totalLatencyMs: number;
+}
+
+export interface ParseResponse {
+  status: string;
+  promptID: string;
+  parsedData: ParsedPrompt;
+  overallScores: number;
+  completionTokens: number;
+  promptTokens: number;
+  parseLatencyMs: number;
+}
+
+export interface OptimizeExistingResponse {
+  status: string;
+  promptID: string;
+  optimizedPromptID: string;
+  optimizedPrompt: string;
+  finalTokenSize: number;
+  usedLLM: string;
+  optimizeLatencyMs: number;
 }
 
 export interface FeedbackRequest {

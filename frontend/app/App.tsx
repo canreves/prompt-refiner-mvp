@@ -10,12 +10,14 @@ import { Toaster } from '@/app/components/ui/sonner';
 import { toast } from 'sonner';
 import { LogOut } from 'lucide-react';
 import { 
+  parsePromptService,
+  optimizeExistingService,
   optimizePromptService, 
   getPromptHistoryService, 
   deletePromptService,
   saveFeedbackService 
 } from '@/services/api';
-import type { PromptDBModel, AuthUser } from '@/types';
+import type { PromptDBModel, AuthUser, ParseResponse } from '@/types';
 
 // Local UI history item (derived from PromptDBModel)
 interface HistoryItem {
@@ -33,6 +35,7 @@ interface ScoreWeights {
   style: number;
   output: number;
   rules: number;
+  [key: string]: number; // Index signature for compatibility
 }
 
 export default function App() {
@@ -48,6 +51,8 @@ export default function App() {
   });
   const [optimizedPrompt, setOptimizedPrompt] = useState('');
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parsedData, setParsedData] = useState<ParseResponse | null>(null);
   const [tokenCount, setTokenCount] = useState(0);
   const [latency, setLatency] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -82,37 +87,57 @@ export default function App() {
     }
   };
 
-  const handleOptimize = async () => {
+  // Step 1: Parse the prompt
+  const handleParse = async () => {
     if (!prompt.trim()) return;
 
-    setIsOptimizing(true);
-    const startTime = Date.now();
+    setIsParsing(true);
     
     try {
-      // Call the real backend API
       const userID = currentUser?.uid || 'anonymous-user';
-      const response = await optimizePromptService(prompt, userID);
+      const response = await parsePromptService(prompt, userID);
       
-      const endTime = Date.now();
-      const calculatedLatency = response.latencyMs?.default || (endTime - startTime);
-      
-      // Extract data from response
-      const optimizedText = response.optimizedPrompts?.default || '';
-      const tokens = response.initialTokenSize || Math.ceil(prompt.length / 4);
-      
-      setOptimizedPrompt(optimizedText);
-      setTokenCount(tokens);
-      setLatency(calculatedLatency);
+      setParsedData(response);
       setCurrentPromptID(response.promptID);
+      setTokenCount(response.completionTokens);
+      
+      toast.success('Prompt analyzed successfully! Review the results and click Optimize.');
+      
+    } catch (error: any) {
+      console.error('Parse error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to analyze prompt. Please try again.');
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  // Step 2: Optimize the parsed prompt
+  const handleOptimizeAfterParse = async () => {
+    if (!currentPromptID) {
+      toast.error('Please analyze the prompt first.');
+      return;
+    }
+
+    setIsOptimizing(true);
+    
+    try {
+      const response = await optimizeExistingService(
+        currentPromptID,
+        scoreWeights,
+        selectedLLM || 'openai/gpt-oss-20b'
+      );
+      
+      setOptimizedPrompt(response.optimizedPrompt);
+      setLatency(response.optimizeLatencyMs);
       
       // Add to local history
       const newHistoryItem: HistoryItem = {
-        id: response.promptID,
+        id: currentPromptID,
         prompt,
-        optimizedPrompt: optimizedText,
+        optimizedPrompt: response.optimizedPrompt,
         timestamp: new Date(),
-        tokenCount: tokens,
-        latency: calculatedLatency,
+        tokenCount: tokenCount,
+        latency: response.optimizeLatencyMs,
       };
       
       setHistory([newHistoryItem, ...history]);
@@ -123,6 +148,58 @@ export default function App() {
       toast.error(error.response?.data?.detail || 'Failed to optimize prompt. Please try again.');
     } finally {
       setIsOptimizing(false);
+    }
+  };
+
+  // Combined: Quick optimize (parse + optimize in one go)
+  const handleQuickOptimize = async () => {
+    if (!prompt.trim()) return;
+
+    setIsOptimizing(true);
+    setIsParsing(true);
+    
+    try {
+      const userID = currentUser?.uid || 'anonymous-user';
+      const response = await optimizePromptService(
+        prompt,
+        userID,
+        scoreWeights,
+        selectedLLM || 'openai/gpt-oss-20b'
+      );
+      
+      setOptimizedPrompt(response.optimizedPrompt);
+      setTokenCount(response.initialTokenSize);
+      setLatency(response.totalLatencyMs);
+      setCurrentPromptID(response.promptID);
+      setParsedData({
+        status: response.status,
+        promptID: response.promptID,
+        parsedData: response.parsedData,
+        overallScores: response.overallScores,
+        completionTokens: response.initialTokenSize,
+        promptTokens: 0,
+        parseLatencyMs: response.parseLatencyMs
+      });
+      
+      // Add to local history
+      const newHistoryItem: HistoryItem = {
+        id: response.promptID,
+        prompt,
+        optimizedPrompt: response.optimizedPrompt,
+        timestamp: new Date(),
+        tokenCount: response.initialTokenSize,
+        latency: response.totalLatencyMs,
+      };
+      
+      setHistory([newHistoryItem, ...history]);
+      toast.success('Prompt optimized successfully!');
+      
+    } catch (error: any) {
+      console.error('Optimization error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to optimize prompt. Please try again.');
+    } finally {
+      setIsOptimizing(false);
+      setIsParsing(false);
     }
   };
 
@@ -174,6 +251,7 @@ export default function App() {
   const handleNewPrompt = () => {
     setPrompt('');
     setOptimizedPrompt('');
+    setParsedData(null);
     setTokenCount(0);
     setLatency(0);
     setSelectedLLM('');
@@ -236,7 +314,85 @@ export default function App() {
           
           <ScoreSettings weights={scoreWeights} onChange={setScoreWeights} />
           
-          <OptimizeButton onClick={handleOptimize} isLoading={isOptimizing} disabled={!prompt.trim()} />
+          {/* Two-Step Workflow */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleParse}
+              disabled={!prompt.trim() || isParsing}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg transition"
+            >
+              {isParsing ? 'Analyzing...' : '1. Analyze Prompt'}
+            </button>
+            
+            <button
+              onClick={handleOptimizeAfterParse}
+              disabled={!parsedData || isOptimizing}
+              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg transition"
+            >
+              {isOptimizing ? 'Optimizing...' : '2. Optimize'}
+            </button>
+            
+            <button
+              onClick={handleQuickOptimize}
+              disabled={!prompt.trim() || isOptimizing || isParsing}
+              className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg transition"
+            >
+              {isOptimizing || isParsing ? 'Processing...' : '⚡ Quick Optimize'}
+            </button>
+          </div>
+          
+          {/* Show Parsed Data */}
+          {parsedData && !optimizedPrompt && (
+            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-lg font-semibold mb-4">Analysis Results</h3>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <span className="font-medium">Overall Score: </span>
+                  <span className="text-lg font-bold text-blue-600">
+                    {parsedData.overallScores?.toFixed(1) || 'N/A'}/10
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  {parsedData.parsedData?.task && (
+                    <div>
+                      <div className="font-medium text-gray-700">Task:</div>
+                      <div className="text-gray-600">{parsedData.parsedData.task}</div>
+                      <div className="text-xs text-gray-500">Score: {parsedData.parsedData.task_score}/10</div>
+                    </div>
+                  )}
+                  {parsedData.parsedData?.role && (
+                    <div>
+                      <div className="font-medium text-gray-700">Role:</div>
+                      <div className="text-gray-600">{parsedData.parsedData.role}</div>
+                      <div className="text-xs text-gray-500">Score: {parsedData.parsedData.role_score}/10</div>
+                    </div>
+                  )}
+                  {parsedData.parsedData?.style && (
+                    <div>
+                      <div className="font-medium text-gray-700">Style:</div>
+                      <div className="text-gray-600">{parsedData.parsedData.style}</div>
+                      <div className="text-xs text-gray-500">Score: {parsedData.parsedData.style_score}/10</div>
+                    </div>
+                  )}
+                  {parsedData.parsedData?.output && (
+                    <div>
+                      <div className="font-medium text-gray-700">Output:</div>
+                      <div className="text-gray-600">{parsedData.parsedData.output}</div>
+                      <div className="text-xs text-gray-500">Score: {parsedData.parsedData.output_score}/10</div>
+                    </div>
+                  )}
+                </div>
+                <div className="pt-3 border-t">
+                  <p className="text-sm text-gray-600">
+                    ✓ Prompt analyzed in {parsedData.parseLatencyMs.toFixed(0)}ms
+                  </p>
+                  <p className="text-sm text-blue-600 mt-2">
+                    → Now click "2. Optimize" to generate an improved version, or adjust weights first.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {optimizedPrompt && (
             <ResultDisplay 

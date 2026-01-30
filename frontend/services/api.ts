@@ -3,6 +3,8 @@ import type {
   PromptInput,
   PromptDBModel,
   OptimizeResponse,
+  ParseResponse,
+  OptimizeExistingResponse,
   FeedbackRequest,
   PromptHistoryResponse,
   User,
@@ -15,11 +17,54 @@ const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/v1";
 // ============== Prompt Services ==============
 
 /**
- * Optimize a prompt using the backend AI service
+ * Parse a prompt and analyze it (Step 1)
+ */
+export const parsePromptService = async (
+  userInput: string,
+  userID: string = "default-user"
+): Promise<ParseResponse> => {
+  try {
+    const payload: PromptInput = {
+      userID: userID,
+      inputPrompt: userInput,
+    };
+
+    const response = await axios.post<ParseResponse>(`${API_URL}/parse`, payload);
+    return response.data;
+  } catch (error) {
+    console.error("Parse Error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Optimize an already-parsed prompt (Step 2)
+ */
+export const optimizeExistingService = async (
+  promptID: string,
+  weights?: Record<string, number>,
+  aiModel: string = "openai/gpt-oss-20b"
+): Promise<OptimizeExistingResponse> => {
+  try {
+    const response = await axios.post<OptimizeExistingResponse>(
+      `${API_URL}/optimizeExisting/${promptID}`,
+      { weights, ai_model: aiModel }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Optimize Error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Combined: Parse and optimize in one request (Quick workflow)
  */
 export const optimizePromptService = async (
   userInput: string, 
-  userID: string = "default-user"
+  userID: string = "default-user",
+  weights?: Record<string, number>,
+  aiModel: string = "openai/gpt-oss-20b"
 ): Promise<OptimizeResponse> => {
   try {
     const payload: PromptInput = {
@@ -27,7 +72,10 @@ export const optimizePromptService = async (
       inputPrompt: userInput,
     };
 
-    const response = await axios.post<OptimizeResponse>(`${API_URL}/optimize`, payload);
+    const response = await axios.post<OptimizeResponse>(
+      `${API_URL}/optimize`,
+      { ...payload, weights, ai_model: aiModel }
+    );
     return response.data;
 
   } catch (error) {

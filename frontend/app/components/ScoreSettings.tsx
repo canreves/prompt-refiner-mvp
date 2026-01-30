@@ -6,6 +6,7 @@ interface ScoreWeights {
   style: number;
   output: number;
   rules: number;
+  [key: string]: number; // Index signature for compatibility
 }
 
 interface ScoreSettingsProps {

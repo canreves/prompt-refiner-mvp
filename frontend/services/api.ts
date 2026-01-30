@@ -1,22 +1,33 @@
 import axios from 'axios';
+import type {
+  PromptInput,
+  PromptDBModel,
+  OptimizeResponse,
+  FeedbackRequest,
+  PromptHistoryResponse,
+  User,
+  AuthUser
+} from '@/types';
 
 // Backend URL (configured via VITE_API_URL environment variable)
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/v1";
 
+// ============== Prompt Services ==============
+
 /**
  * Optimize a prompt using the backend AI service
- * @param {string} userInput - The prompt to optimize
- * @param {string} userID - The user's ID
- * @returns {Promise} The optimized prompt data
  */
-export const optimizePromptService = async (userInput, userID = "default-user") => {
+export const optimizePromptService = async (
+  userInput: string, 
+  userID: string = "default-user"
+): Promise<OptimizeResponse> => {
   try {
-    const payload = {
+    const payload: PromptInput = {
       userID: userID,
       inputPrompt: userInput,
     };
 
-    const response = await axios.post(`${API_URL}/optimize`, payload);
+    const response = await axios.post<OptimizeResponse>(`${API_URL}/optimize`, payload);
     return response.data;
 
   } catch (error) {
@@ -27,13 +38,13 @@ export const optimizePromptService = async (userInput, userID = "default-user") 
 
 /**
  * Get prompt history for a user
- * @param {string} userID - The user's ID
- * @param {number} limit - Maximum number of items to return
- * @returns {Promise} The prompt history
  */
-export const getPromptHistoryService = async (userID, limit = 50) => {
+export const getPromptHistoryService = async (
+  userID: string, 
+  limit: number = 50
+): Promise<PromptDBModel[]> => {
   try {
-    const response = await axios.get(`${API_URL}/history/${userID}?limit=${limit}`);
+    const response = await axios.get<PromptDBModel[]>(`${API_URL}/history/${userID}?limit=${limit}`);
     return response.data;
   } catch (error) {
     console.error("History fetch error:", error);
@@ -42,11 +53,22 @@ export const getPromptHistoryService = async (userID, limit = 50) => {
 };
 
 /**
- * Delete a prompt from history
- * @param {string} promptID - The prompt ID to delete
- * @returns {Promise} The deletion result
+ * Get a single prompt by ID
  */
-export const deletePromptService = async (promptID) => {
+export const getPromptService = async (promptID: string): Promise<PromptDBModel | null> => {
+  try {
+    const response = await axios.get<PromptDBModel>(`${API_URL}/prompt/${promptID}`);
+    return response.data;
+  } catch (error) {
+    console.error("Get prompt error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a prompt from history
+ */
+export const deletePromptService = async (promptID: string): Promise<{ success: boolean }> => {
   try {
     const response = await axios.delete(`${API_URL}/prompt/${promptID}`);
     return response.data;
@@ -58,10 +80,8 @@ export const deletePromptService = async (promptID) => {
 
 /**
  * Save user feedback for a prompt
- * @param {Object} feedbackData - The feedback data
- * @returns {Promise} The saved feedback result
  */
-export const saveFeedbackService = async (feedbackData) => {
+export const saveFeedbackService = async (feedbackData: FeedbackRequest): Promise<{ success: boolean }> => {
   try {
     const response = await axios.post(`${API_URL}/feedback`, feedbackData);
     return response.data;
@@ -73,11 +93,11 @@ export const saveFeedbackService = async (feedbackData) => {
 
 /**
  * Toggle favorite status of a prompt
- * @param {string} promptID - The prompt ID
- * @param {boolean} isFavorite - The new favorite status
- * @returns {Promise} The update result
  */
-export const toggleFavoriteService = async (promptID, isFavorite) => {
+export const toggleFavoriteService = async (
+  promptID: string, 
+  isFavorite: boolean
+): Promise<{ success: boolean }> => {
   try {
     const response = await axios.put(`${API_URL}/prompt/${promptID}/favorite`, { isFavorite });
     return response.data;
@@ -87,12 +107,12 @@ export const toggleFavoriteService = async (promptID, isFavorite) => {
   }
 };
 
+// ============== User Services ==============
+
 /**
  * Create a new user
- * @param {Object} userData - The user data
- * @returns {Promise} The created user result
  */
-export const createUserService = async (userData) => {
+export const createUserService = async (userData: Partial<User>): Promise<User> => {
   try {
     const payload = {
       name: userData.name,
@@ -102,7 +122,7 @@ export const createUserService = async (userData) => {
       profileImageURL: userData.profileImageURL || null
     };
 
-    const response = await axios.post(`${API_URL}/create`, payload);
+    const response = await axios.post<User>(`${API_URL}/create`, payload);
     return response.data;
 
   } catch (error) {
@@ -113,12 +133,10 @@ export const createUserService = async (userData) => {
 
 /**
  * Get user by ID
- * @param {string} userID - The user ID
- * @returns {Promise} The user data
  */
-export const getUserService = async (userID) => {
+export const getUserService = async (userID: string): Promise<User | null> => {
   try {
-    const response = await axios.get(`${API_URL}/${userID}`);
+    const response = await axios.get<User>(`${API_URL}/${userID}`);
     return response.data;
   } catch (error) {
     console.error("Get user error:", error);
@@ -126,29 +144,32 @@ export const getUserService = async (userID) => {
   }
 };
 
+// ============== Auth Services ==============
+
 /**
- * Login user
- * @param {string} username - The username
- * @param {string} password - The password
- * @returns {Promise} The login result with token
+ * Verify Firebase token with backend
  */
-export const loginService = async (username, password) => {
+export const verifyTokenService = async (idToken: string): Promise<AuthUser> => {
   try {
-    const response = await axios.post(`${API_URL}/login`, { username, password });
+    const response = await axios.post<AuthUser>(`${API_URL}/auth/verify-token`, {
+      id_token: idToken
+    });
     return response.data;
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Verify token error:", error);
     throw error;
   }
 };
 
+// ============== Test Services ==============
+
 /**
  * Test Nebius AI endpoint
- * @param {string} userInput - The input to test
- * @param {string} aiModel - The AI model to use
- * @returns {Promise} The AI response
  */
-export const testNebiusService = async (userInput, aiModel = "meta-llama/Llama-3.3-70B-Instruct") => {
+export const testNebiusService = async (
+  userInput: string, 
+  aiModel: string = "meta-llama/Llama-3.3-70B-Instruct"
+): Promise<any> => {
   try {
     const response = await axios.post(`${API_URL}/testNebius`, {
       user_input: userInput,

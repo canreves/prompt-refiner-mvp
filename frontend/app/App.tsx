@@ -15,7 +15,9 @@ import {
   deletePromptService,
   saveFeedbackService 
 } from '@/services/api';
+import type { PromptDBModel, AuthUser } from '@/types';
 
+// Local UI history item (derived from PromptDBModel)
 interface HistoryItem {
   id: string;
   prompt: string;
@@ -49,7 +51,7 @@ export default function App() {
   const [tokenCount, setTokenCount] = useState(0);
   const [latency, setLatency] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ uid: string; email: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [currentPromptID, setCurrentPromptID] = useState<string | null>(null);
 
   // Load prompt history when user logs in
@@ -63,18 +65,17 @@ export default function App() {
     if (!currentUser) return;
     
     try {
-      const response = await getPromptHistoryService(currentUser.uid);
-      if (response.status === 'success' && response.history) {
-        const formattedHistory: HistoryItem[] = response.history.map((item: any) => ({
-          id: item.id,
-          prompt: item.prompt,
-          optimizedPrompt: item.optimizedPrompt,
-          timestamp: new Date(item.timestamp),
-          tokenCount: item.tokenCount,
-          latency: item.latency,
-        }));
-        setHistory(formattedHistory);
-      }
+      const prompts: PromptDBModel[] = await getPromptHistoryService(currentUser.uid);
+      // Map PromptDBModel to local HistoryItem format
+      const formattedHistory: HistoryItem[] = prompts.map((item: PromptDBModel) => ({
+        id: item.promptID,
+        prompt: item.inputPrompt,
+        optimizedPrompt: item.optimizedPrompts?.default || Object.values(item.optimizedPrompts || {})[0] || '',
+        timestamp: new Date(item.createdAt),
+        tokenCount: item.initialTokenSize,
+        latency: item.latencyMs?.default || Object.values(item.latencyMs || {})[0] || 0,
+      }));
+      setHistory(formattedHistory);
     } catch (error) {
       console.error('Error loading history:', error);
       // Don't show error toast for history loading failures

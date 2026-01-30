@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { signInWithGoogle } from '@/services/authService';
+import type { AuthUser } from '@/types';
 
 interface LoginPageProps {
-  onLoginSuccess: (user: { uid: string; email: string; name?: string; picture?: string }) => void;
+  onLoginSuccess: (user: AuthUser) => void;
 }
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {

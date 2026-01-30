@@ -1,6 +1,6 @@
 # Firebase Kurulum Rehberi
 
-Bu uygulama, kullanıcı authentication (giriş/kayıt) ve feedback'lerin (rating'lerin) Firestore database'de saklanması için Firebase kullanır.
+Bu uygulama, kullanıcı authentication (giriş/kayıt) ve rating'lerin (1-5) Firestore database'de saklanması için Firebase kullanır. Ratings doğrudan prompts koleksiyonunda saklanır.
 
 ## Adım 1: Firebase Projesi Oluşturma
 
@@ -79,11 +79,12 @@ service cloud.firestore {
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Feedback collection - sadece yazma izni
-    match /feedbacks/{feedbackId} {
-      allow read: if false; // Kullanıcılar feedback'leri okuyamaz
-      allow create: if true; // Herkes feedback gönderebilir
-      allow update, delete: if false; // Feedback güncellenemez/silinemez
+    // Prompts collection - ratings are stored directly in prompt documents
+    match /prompts/{promptId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userID;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userID;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userID;
     }
   }
 }
@@ -91,24 +92,20 @@ service cloud.firestore {
 
 ## Adım 7: Collection Yapısı
 
-Uygulama, Firestore'da `feedbacks` koleksiyonunu kullanır. Her feedback dokümanı şu alanları içerir:
+Uygulama, Firestore'da `prompts` koleksiyonunu kullanır. Ratings (1-5) doğrudan prompt dokümanında saklanır:
 
 ```javascript
 {
-  originalPrompt: "...",        // Kullanıcının girdiği orijinal prompt
-  optimizedPrompt: "...",       // Optimize edilmiş prompt
-  rating: 5,                    // 1-5 arası kullanıcı değerlendirmesi
-  selectedLLM: "ChatGPT",       // Seçilen LLM modeli (opsiyonel)
-  scoreWeights: {               // Skor ağırlıkları (opsiyonel)
-    task: 2,
-    role: 2,
-    style: 2,
-    output: 2,
-    rules: 2
+  promptID: "...",
+  userID: "...",
+  inputPrompt: "...",
+  optimizedPrompts: {...},
+  ratings: {
+    user: 5                     // 1-5 arası kullanıcı değerlendirmesi
   },
-  tokenCount: 123,              // Token sayısı
-  latency: 1500,                // İşlem süresi (ms)
-  createdAt: Timestamp          // Oluşturulma zamanı (otomatik)
+  initialTokenSize: 123,
+  latencyMs: {...},
+  createdAt: Timestamp
 }
 ```
 
@@ -122,11 +119,11 @@ Uygulama, Firestore'da `feedbacks` koleksiyonunu kullanır. Her feedback doküma
 5. Sağ üst köşedeki **"Logout"** butonu ile çıkış yapabilirsiniz
 6. Tekrar giriş yapmak için aynı e-posta ve şifreyi kullanın
 
-### Firestore Feedback Testi:
+### Rating Testi:
 1. Giriş yaptıktan sonra bir prompt girin ve optimize edin
-2. Sonuçta görünen yıldız rating sistemini kullanarak değerlendirme yapın
-3. Firebase Console > Firestore Database'de `feedbacks` koleksiyonunu kontrol edin
-4. Yeni feedback dokümanının eklendiğini göreceksiniz
+2. Sonuçta görünen yıldız rating sistemini kullanarak 1-5 arası değerlendirme yapın
+3. Firebase Console > Firestore Database'de `prompts` koleksiyonunu kontrol edin
+4. İlgili prompt dokümanında `ratings.user` alanının güncellendiğini göreceksiniz
 
 ### Kullanıcı Kontrolü:
 1. Firebase Console > Authentication > Users sekmesine gidin

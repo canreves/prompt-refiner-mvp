@@ -93,8 +93,8 @@ export interface OptimizeResponse {
 }
 
 export interface FeedbackRequest {
-  promptID: string;
-  ratings: Record<string, number>;
+  promptID: string | null;
+  rating: number; // 1-5
 }
 
 export interface PromptHistoryResponse {

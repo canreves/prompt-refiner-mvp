@@ -135,28 +135,28 @@ export default function App() {
   };
 
   const handleRate = async (rating: number) => {
-    if (!optimizedPrompt || !prompt) {
-      console.warn('No prompt or optimized prompt to rate');
+    if (!currentPromptID) {
+      console.warn('No prompt ID to rate');
+      toast.error('Please optimize a prompt first before rating.');
+      return;
+    }
+
+    // Validate rating is between 1-5
+    if (rating < 1 || rating > 5) {
+      toast.error('Rating must be between 1 and 5');
       return;
     }
 
     try {
       await saveFeedbackService({
         promptID: currentPromptID,
-        originalPrompt: prompt,
-        optimizedPrompt: optimizedPrompt,
         rating: rating,
-        selectedLLM: selectedLLM || undefined,
-        scoreWeights: scoreWeights,
-        tokenCount: tokenCount,
-        latency: latency,
-        userID: currentUser?.uid || 'anonymous',
       });
 
-      toast.success('Thank you for your feedback!');
+      toast.success('Thank you for your rating!');
     } catch (error) {
-      console.error('Error saving feedback:', error);
-      toast.error('Failed to save feedback. Please try again.');
+      console.error('Error saving rating:', error);
+      toast.error('Failed to save rating. Please try again.');
     }
   };
 

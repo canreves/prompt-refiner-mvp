@@ -142,37 +142,34 @@ async def delete_prompt(prompt_id: str):
 @router.post("/feedback")
 async def save_feedback(feedback_data: dict):
     """
-    Save user feedback for a prompt
+    Save user rating for a prompt (1-5)
     
     Request body:
     {
         "promptID": "...",
-        "originalPrompt": "...",
-        "optimizedPrompt": "...",
-        "rating": 5,
-        "selectedLLM": "...",
-        "scoreWeights": {...},
-        "tokenCount": 100,
-        "latency": 1500
+        "rating": 5  // number between 1-5
     }
     """
     try:
         db = get_firestore_client()
         
-        # Save feedback to feedbacks collection
-        feedback_ref = db.collection("feedbacks").document()
-        feedback_data["feedbackID"] = feedback_ref.id
-        feedback_data["createdAt"] = firestore.SERVER_TIMESTAMP
-        feedback_ref.set(feedback_data)
+        # Validate rating
+        rating = feedback_data.get("rating")
+        if not rating or not isinstance(rating, (int, float)) or rating < 1 or rating > 5:
+            raise HTTPException(status_code=400, detail="Rating must be a number between 1 and 5")
         
-        # Update prompt rating if promptID provided
+        # Update prompt with rating directly
         if feedback_data.get("promptID"):
             prompt_ref = db.collection("prompts").document(feedback_data["promptID"])
             prompt_ref.update({
-                "ratings": {"user": feedback_data.get("rating", 0)}
+                "ratings": {"user": int(rating)}
             })
+            return {"status": "success", "promptID": feedback_data["promptID"]}
+        else:
+            raise HTTPException(status_code=400, detail="promptID is required")
         
-        return {"status": "success", "feedbackID": feedback_ref.id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

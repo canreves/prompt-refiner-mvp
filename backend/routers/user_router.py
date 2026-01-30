@@ -1,19 +1,21 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime
 import uuid
+from passlib.context import CryptContext
+import jwt
 
 import sys
 from pathlib import Path
 
 try:
     from schemas.user import User
-    from services.firebase_db import save_user_to_firestore
+    from services.firebase_db import save_user_to_firestore, get_firestore_client
 except ImportError:
     # Add parent directory to path when running directly
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from schemas.user import User
-    from services.firebase_db import save_user_to_firestore
+    from services.firebase_db import save_user_to_firestore, get_firestore_client
     
 
 router = APIRouter()
@@ -26,6 +28,23 @@ class UserCreateRequest:
         self.username = username
         self.email = email
         self.profileImageURL = profileImageURL
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Secret key for JWT
+SECRET_KEY = "your_secret_key"
+ALGORITHM = "HS256"
+
+# Helper functions
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict):
+    return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
 
 @router.post("/create", response_model=dict)
 async def create_user(user_data: dict):
@@ -93,6 +112,49 @@ async def get_user(user_id: str):
             "user": user_doc.to_dict()
         }
         
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/login")
+async def login(user_data: dict):
+    """
+    Login endpoint to authenticate users.
+
+    Request body:
+    {
+        "username": "johndoe",
+        "password": "password123"
+    }
+    """
+    try:
+        from services.firebase_db import get_firestore_client
+        db = get_firestore_client()
+
+        # Retrieve user by username
+        users_ref = db.collection("users")
+        query = users_ref.where("username", "==", user_data["username"]).stream()
+        user_doc = next(query, None)
+
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user = user_doc.to_dict()
+
+        # Verify password
+        if not verify_password(user_data["password"], user["password"]):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        # Create JWT token
+        token = create_access_token({"sub": user["username"]})
+
+        return {
+            "status": "success",
+            "access_token": token,
+            "token_type": "bearer"
+        }
+
     except HTTPException:
         raise
     except Exception as e:

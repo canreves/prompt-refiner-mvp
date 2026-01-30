@@ -11,7 +11,7 @@ venv/
 .vscode/
 .idea/
 
-.venv
+# Firebase credentials
 backend/services/serviceAccountKey.json
 
 node_modules/

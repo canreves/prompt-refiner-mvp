@@ -19,13 +19,23 @@ class PromptInput(BaseModel):
     inputPrompt: str
     targetRole : Optional[str] = ""
  
-# 1. parsed data
+# 1. parsed data with scores
 class ParsedPrompt(BaseModel):
-    role: Optional[str] = None
+    # Aspects
     task: Optional[str] = None
-    context: Optional[str] = None
+    role: Optional[str] = None
     style: Optional[str] = None
-    output : Optional[str] = None
+    output: Optional[str] = None
+    rules: Optional[str] = None
+    context: Optional[str] = None
+    
+    # Scores (0-10)
+    task_score: Optional[int] = 0
+    role_score: Optional[int] = 0
+    style_score: Optional[int] = 0
+    output_score: Optional[int] = 0
+    rules_score: Optional[int] = 0
+    context_score: Optional[int] = 0
 
 
 # 2. prompt object data to be stored in firestore

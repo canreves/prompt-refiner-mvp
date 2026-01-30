@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+import json
 
 
 # from schemas.prompt import PromptInput, PromptDBModel
@@ -22,11 +23,13 @@ router = APIRouter()
 @router.post("/optimize", response_model=PromptDBModel)
 async def optimize_prompt(request: PromptInput):
     try:
-        # 1. step: analyze prompt (parsing)
-        parsed_result = parse_prompt_with_nebius(request.inputPrompt)
+        # 1. step: FIRST optimize the user's prompt (returns JSON dict)
+        optimized_data = optimize_prompt_with_nebius(request.inputPrompt)
         
-        # 2. step: optimize it
-        optimized_text = optimize_prompt_with_nebius(parsed_result, request.inputPrompt)
+        # 2. step: THEN analyze the OPTIMIZED prompt 
+        # Convert optimized dict to string for analysis
+        optimized_text = json.dumps(optimized_data, ensure_ascii=False)
+        parsed_result = parse_prompt_with_nebius(optimized_text)
         
         # 3. step: calculate metrics
         initial_tokens = len(request.inputPrompt.split())
@@ -38,8 +41,8 @@ async def optimize_prompt(request: PromptInput):
             userID=request.userID,
             projectID="default-project",
             inputPrompt=request.inputPrompt,
-            parsedData=parsed_result,
-            optimizedPrompts={"default": optimized_text},
+            parsedData=parsed_result,  # This is now analysis of OPTIMIZED prompt
+            optimizedPrompts=optimized_data,  # Now it's a dict with task, role, style, etc.
             initialTokenSize=initial_tokens,
             finalTokenSizes={"default": final_tokens},
             latencyMs={"default": 0.0} # now 0

@@ -10,7 +10,13 @@ venv/
 # IDE
 .vscode/
 .idea/
-frontend/node_modules
 
+# Node
 node_modules/
-.venv/
+build/
+dist/
+npm-debug.log*
+yarn-debug.log*
+
+.venv
+backend/services/serviceAccountKey.json

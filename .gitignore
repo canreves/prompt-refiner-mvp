@@ -13,3 +13,7 @@ venv/
 
 .venv
 backend/services/serviceAccountKey.json
+
+node_modules/
+**/node_modules/
+frontend/node_modules

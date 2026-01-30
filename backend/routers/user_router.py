@@ -58,7 +58,7 @@ async def create_user(user_data: dict):
             email=user_data["email"],
             profileImageURL=user_data.get("profileImageURL"),
             createdAt=datetime.now(),
-            last50Prompts=[],
+    
             projectIDs=[]
         )
         

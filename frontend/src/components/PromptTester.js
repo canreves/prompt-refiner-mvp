@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { optimizePromptService } from '../services/api'; // Yazdığımız servisi çağırıyoruz
+import { optimizePromptService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const PromptTester = () => {
-  // Durumları (State) tutuyoruz
+  const { currentUser, logout } = useAuth();
+  const navigate = useNavigate();
+
   const [input, setInput] = useState("");          // Kullanıcının yazdığı yazı
   const [result, setResult] = useState(null);      // Backend'den gelen cevap
   const [loading, setLoading] = useState(false);   // Yükleniyor mu?
@@ -29,9 +33,24 @@ const PromptTester = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch {
+      setError('Çıkış yapılamadı');
+    }
+  };
+
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
-      <h2>⚡ Prompt Optimizer Test</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>⚡ Prompt Optimizer Test</h2>
+        <div>
+          <span>{currentUser?.email} </span>
+          <button onClick={handleLogout} style={{ marginLeft: '10px', padding: '5px 10px', cursor: 'pointer' }}>Çıkış Yap</button>
+        </div>
+      </div>
 
       {/* Input Alanı */}
       <textarea
@@ -68,7 +87,7 @@ const PromptTester = () => {
           <p><strong>Optimize Edilmiş Prompt:</strong></p>
           <p style={{ fontStyle: "italic" }}>{result.optimized_prompt}</p>
 
-          <p><small>Token Değişimi: {result.metrics?.initial_tokens} -> {result.metrics?.final_tokens}</small></p>
+          <p><small>Token Değişimi: {result.metrics?.initial_tokens} &rarr; {result.metrics?.final_tokens}</small></p>
         </div>
       )}
     </div>

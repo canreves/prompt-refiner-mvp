@@ -90,4 +90,3 @@ def test_nebius_api(prompt :str, ai_model: str = "openai/gpt-oss-20b") -> str:
     )
 
     return json.loads(response.to_json())
-

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from ..core.deps import get_current_user
 from typing import Optional
 from datetime import datetime
 import uuid
@@ -26,9 +27,10 @@ class UserCreateRequest:
         self.profileImageURL = profileImageURL
 
 @router.post("/create", response_model=dict)
-async def create_user(user_data: dict):
+async def create_user(user_data: dict, current_user: dict = Depends(get_current_user)):
     """
-    Create a new user in Firebase database
+    Create a new user in Firebase database.
+    Requires Authorization bearer token.
     
     Request body:
     {
@@ -46,9 +48,12 @@ async def create_user(user_data: dict):
             if field not in user_data:
                 raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
         
-        # Create user instance with generated ID
+        # Use the UID from the authenticated token
+        user_id = current_user['uid']
+        
+        # Create user instance with Firebase Auth UID
         user = User(
-            userID=user_data.get("userID", str(uuid.uuid4())),
+            userID=user_id,
             name=user_data["name"],
             surname=user_data["surname"],
             username=user_data["username"],
@@ -60,7 +65,7 @@ async def create_user(user_data: dict):
         )
         
         # Save to Firebase
-        user_id = user.save_to_firestore()
+        user.save_to_firestore()
         
         return {
             "status": "success",
